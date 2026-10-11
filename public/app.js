@@ -13,6 +13,7 @@ let displayedTrackingNumber;
 let trackingRequestId = 0;
 
 const demoTrackingNumber = "ST-8492-0317";
+const deliveryStatuses = ["Order placed", "Picked up", "In transit", "Out for delivery", "Delivered"];
 
 function normalizeTrackingNumber(value) {
   return value.trim().toUpperCase();
@@ -107,13 +108,17 @@ function renderMap(shipment, fitRoute) {
   const destinationIcon = L.divIcon({ className: "", html: '<span class="route-destination-marker"></span>', iconSize: [14, 14], iconAnchor: [7, 7] });
   L.marker(points[0], { icon: originIcon }).bindTooltip(route[0].name || shipment.origin).addTo(mapLayers);
   L.marker(points[points.length - 1], { icon: destinationIcon }).bindTooltip(route.at(-1).name || shipment.destination).addTo(mapLayers);
-  const fallbackPosition = positionOnRoute(route, shipment.progress || 0);
+  const statusIndex = deliveryStatuses.indexOf(shipment.status);
+  const routeProgress = statusIndex < 0 ? 0 : statusIndex / (deliveryStatuses.length - 1);
+  const fallbackPosition = positionOnRoute(route, routeProgress);
   const gpsPosition = shipment.currentLocation &&
     Number.isFinite(shipment.currentLocation.latitude) &&
     Number.isFinite(shipment.currentLocation.longitude)
     ? L.latLng(shipment.currentLocation.latitude, shipment.currentLocation.longitude)
     : null;
-  const courierPosition = gpsPosition || fallbackPosition;
+  const courierPosition = shipment.status === "Delivered"
+    ? points.at(-1)
+    : gpsPosition || fallbackPosition;
   const courierIcon = L.divIcon({ className: "", html: '<span class="courier-map-marker"></span>', iconSize: [22, 22], iconAnchor: [11, 11] });
   L.marker(courierPosition, { icon: courierIcon })
     .bindTooltip("Your courier", { permanent: true, direction: "right", className: "courier-tooltip", offset: [12, 0] })
@@ -138,13 +143,12 @@ function renderShipment(shipment) {
   document.querySelector("#shipment-service").textContent = shipment.service || "Standard delivery";
   document.querySelector("#shipment-updated").textContent = shipment.updatedAt ? formatTime(shipment.updatedAt) : "Waiting for update";
   const events = Array.isArray(shipment.events) ? shipment.events : [];
-  const deliverySteps = ["Order placed", "Picked up", "In transit", "Out for delivery", "Delivered"];
-  const completedSteps = Math.max(deliverySteps.indexOf(shipment.status) + 1, 0);
-  const progress = Math.round((completedSteps / deliverySteps.length) * 100);
+  const completedSteps = Math.max(deliveryStatuses.indexOf(shipment.status) + 1, 0);
+  const progress = Math.round((completedSteps / deliveryStatuses.length) * 100);
   const progressBar = document.querySelector(".delivery-progress-track");
   progressBar.setAttribute("aria-valuenow", String(progress));
   document.querySelector("#shipment-progress-bar").style.width = `${progress}%`;
-  document.querySelector("#shipment-progress-label").textContent = `${completedSteps} of ${deliverySteps.length} steps`;
+  document.querySelector("#shipment-progress-label").textContent = `${completedSteps} of ${deliveryStatuses.length} steps`;
   document.querySelector(".section-heading h2").textContent =
     shipment.status === "Delivered" ? "Safely delivered" : "On its way to you";
   const hasRoute = Array.isArray(shipment.route) && shipment.route.length > 1;
@@ -156,7 +160,8 @@ function renderShipment(shipment) {
     shipment.status === "Delivered" ? "DELIVERED" : shipment.currentLocation ? "COURIER GPS" : "ROUTE ESTIMATE";
   document.querySelector("#courier-location").textContent = shipment.currentLocation?.updatedAt
     ? `Updated ${formatTime(shipment.currentLocation.updatedAt)}`
-    : hasRoute ? "Estimated position · awaiting GPS" : "Awaiting first location scan";
+    : shipment.status === "Delivered" ? "Delivered at destination"
+      : hasRoute ? "Estimated position · awaiting GPS" : "Awaiting first location scan";
   document.querySelector("#courier-distance-label").textContent =
     shipment.status === "Delivered" ? "Delivered" : shipment.currentLocation?.label ? "Live GPS" : hasRoute ? "Route estimate" : "Awaiting location";
   renderMap(shipment, isNewShipment);
