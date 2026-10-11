@@ -10,12 +10,55 @@ const map = window.L ? L.map("live-map", { zoomControl: false, scrollWheelZoom: 
 const mapLayers = map ? L.layerGroup().addTo(map) : null;
 const mapViewport = document.querySelector("#map-viewport");
 let tileLayer;
+let tileSourceIndex = -1;
+let tileLoadErrors = 0;
 let displayedTrackingNumber;
 let trackingRequestId = 0;
 let mapResizeFrame = 0;
 
 const demoTrackingNumber = "ST-8492-0317";
 const deliveryStatuses = ["Order placed", "Picked up", "In transit", "Out for delivery", "Delivered"];
+const mapTileSources = [
+  {
+    url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  },
+  {
+    url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+    subdomains: "abcd",
+    attribution: '&copy; OpenStreetMap contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+  }
+];
+const mapTilesUnavailableMessage = "Map tiles could not be loaded. Check your internet connection and try again.";
+
+function addMapTileLayer() {
+  tileSourceIndex += 1;
+  tileLoadErrors = 0;
+  const source = mapTileSources[tileSourceIndex];
+  const sourceLayer = L.tileLayer(source.url, {
+    maxZoom: 19,
+    attribution: source.attribution,
+    ...(source.subdomains ? { subdomains: source.subdomains } : {})
+  }).addTo(map);
+  tileLayer = sourceLayer;
+  tileLayer.on("tileerror", () => {
+    if (tileLayer !== sourceLayer) return;
+    tileLoadErrors += 1;
+    if (tileLoadErrors < 3) return;
+    if (tileSourceIndex < mapTileSources.length - 1) {
+      map.removeLayer(tileLayer);
+      addMapTileLayer();
+      return;
+    }
+    mapEmptyState.textContent = mapTilesUnavailableMessage;
+    mapEmptyState.hidden = false;
+  });
+  tileLayer.on("tileload", () => {
+    if (tileLayer !== sourceLayer) return;
+    tileLoadErrors = 0;
+    if (mapEmptyState.textContent === mapTilesUnavailableMessage) mapEmptyState.hidden = true;
+  });
+}
 
 function normalizeTrackingNumber(value) {
   return value.trim().toUpperCase();
@@ -146,12 +189,7 @@ function renderMap(shipment, fitRoute) {
     mapEmptyState.hidden = false;
     return;
   }
-  if (!tileLayer) {
-    tileLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    }).addTo(map);
-  }
+  if (!tileLayer) addMapTileLayer();
   mapEmptyState.hidden = true;
   const points = route.map((point) => L.latLng(point.lat, point.lng));
   const statusIndex = deliveryStatuses.indexOf(shipment.status);
