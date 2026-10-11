@@ -593,6 +593,7 @@ async function handleRequest(request, response) {
       shipment.status = input.status;
       shipment.updatedAt = now;
       shipment.progress = nextIndex / (allowedStatuses.length - 1);
+      shipment.currentLocation = null;
       shipment.events = allowedStatuses.slice(0, nextIndex + 1).map((status, index) => ({
         status,
         location: status === input.status ? input.location.trim() : shipment.events[index]?.location || shipment.origin,
