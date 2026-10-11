@@ -1,0 +1,107 @@
+{
+  "shipments": [
+    {
+      "trackingNumber": "ST-8492-0317",
+      "recipient": "Jordan Lee",
+      "origin": "Brooklyn, NY",
+      "destination": "Manhattan, NY",
+      "status": "Delivered",
+      "eta": "Today, 2:30 PM – 4:30 PM",
+      "service": "Express delivery",
+      "updatedAt": "2026-10-11T04:56:59.447Z",
+      "route": [
+        {
+          "name": "Brooklyn",
+          "lat": 40.6782,
+          "lng": -73.9442
+        },
+        {
+          "name": "Downtown Brooklyn",
+          "lat": 40.6936,
+          "lng": -73.9897
+        },
+        {
+          "name": "Manhattan Bridge",
+          "lat": 40.7075,
+          "lng": -73.9903
+        },
+        {
+          "name": "Lower Manhattan",
+          "lat": 40.7131,
+          "lng": -74.0062
+        }
+      ],
+      "progress": 1,
+      "events": [
+        {
+          "status": "Order placed",
+          "location": "Brooklyn, NY",
+          "timestamp": "2026-10-08T14:12:00.000Z",
+          "completed": true
+        },
+        {
+          "status": "Picked up",
+          "location": "Brooklyn, NY",
+          "timestamp": "2026-10-08T16:48:00.000Z",
+          "completed": true
+        },
+        {
+          "status": "In transit",
+          "location": "New York Distribution Center",
+          "timestamp": "2026-10-09T04:16:00.000Z",
+          "completed": true
+        },
+        {
+          "status": "Out for delivery",
+          "location": "Manhattan, NY",
+          "timestamp": "2026-10-10T09:24:00.000Z",
+          "completed": true
+        },
+        {
+          "status": "Delivered",
+          "location": "Manhattan, NY",
+          "timestamp": "2026-10-10T16:55:40.475Z",
+          "completed": true
+        }
+      ],
+      "currentLocation": {
+        "latitude": 6.471238,
+        "longitude": 7.526633,
+        "label": "Courier GPS location",
+        "updatedAt": "2026-10-11T04:56:59.447Z"
+      }
+    },
+    {
+      "trackingNumber": "ST-2000-6747",
+      "recipient": "emmanuel",
+      "origin": "enugu",
+      "destination": "lagos",
+      "status": "Order placed",
+      "eta": "Estimated delivery will be confirmed soon",
+      "service": "Standard delivery",
+      "updatedAt": "2026-10-10T15:43:24.302Z",
+      "progress": 0,
+      "route": [
+        {
+          "name": "enugu",
+          "lat": 6.5536094,
+          "lng": 7.4143061
+        },
+        {
+          "name": "lagos",
+          "lat": 6.4550575,
+          "lng": 3.3941795
+        }
+      ],
+      "currentLocation": null,
+      "events": [
+        {
+          "status": "Order placed",
+          "location": "enugu",
+          "timestamp": "2026-10-10T15:43:24.302Z",
+          "completed": true
+        }
+      ]
+    }
+  ]
+}
