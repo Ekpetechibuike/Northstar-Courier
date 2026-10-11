@@ -8,9 +8,11 @@ const timeline = document.querySelector("#timeline-list");
 const mapEmptyState = document.querySelector("#map-empty-state");
 const map = window.L ? L.map("live-map", { zoomControl: false, scrollWheelZoom: false }).setView([0, 0], 2) : null;
 const mapLayers = map ? L.layerGroup().addTo(map) : null;
+const mapViewport = document.querySelector("#map-viewport");
 let tileLayer;
 let displayedTrackingNumber;
 let trackingRequestId = 0;
+let mapResizeFrame = 0;
 
 const demoTrackingNumber = "ST-8492-0317";
 const deliveryStatuses = ["Order placed", "Picked up", "In transit", "Out for delivery", "Delivered"];
@@ -75,6 +77,30 @@ function positionOnRoute(route, progress) {
   return points.at(-1);
 }
 
+function routePrefix(route, progress) {
+  const points = route.map((stop) => L.latLng(stop.lat, stop.lng));
+  if (points.length < 2) return points;
+  const distances = points.slice(1).map((point, index) => points[index].distanceTo(point));
+  let remainingDistance = distances.reduce((sum, distance) => sum + distance, 0) *
+    Math.max(0, Math.min(1, progress));
+  const prefix = [points[0]];
+
+  for (let index = 0; index < distances.length; index += 1) {
+    if (remainingDistance <= distances[index]) {
+      const fraction = distances[index] ? remainingDistance / distances[index] : 0;
+      const endpoint = L.latLng(
+        points[index].lat + (points[index + 1].lat - points[index].lat) * fraction,
+        points[index].lng + (points[index + 1].lng - points[index].lng) * fraction
+      );
+      if (!endpoint.equals(prefix[prefix.length - 1])) prefix.push(endpoint);
+      return prefix;
+    }
+    prefix.push(points[index + 1]);
+    remainingDistance -= distances[index];
+  }
+  return prefix;
+}
+
 function renderMap(shipment, fitRoute) {
   const route = Array.isArray(shipment.route)
     ? shipment.route.filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng))
@@ -103,13 +129,25 @@ function renderMap(shipment, fitRoute) {
   }
   mapEmptyState.hidden = true;
   const points = route.map((point) => L.latLng(point.lat, point.lng));
-  L.polyline(points, { color: "#31734e", weight: 4, opacity: 0.8, dashArray: "7 8" }).addTo(mapLayers);
-  const originIcon = L.divIcon({ className: "", html: '<span class="route-origin-marker"></span>', iconSize: [14, 14], iconAnchor: [7, 7] });
-  const destinationIcon = L.divIcon({ className: "", html: '<span class="route-destination-marker"></span>', iconSize: [14, 14], iconAnchor: [7, 7] });
-  L.marker(points[0], { icon: originIcon }).bindTooltip(route[0].name || shipment.origin).addTo(mapLayers);
-  L.marker(points[points.length - 1], { icon: destinationIcon }).bindTooltip(route.at(-1).name || shipment.destination).addTo(mapLayers);
   const statusIndex = deliveryStatuses.indexOf(shipment.status);
   const routeProgress = statusIndex < 0 ? 0 : statusIndex / (deliveryStatuses.length - 1);
+  const traveledRoute = routePrefix(route, routeProgress);
+  L.polyline(points, { color: "#fff", weight: 9, opacity: 0.9, lineCap: "round", lineJoin: "round" }).addTo(mapLayers);
+  L.polyline(points, { color: "#8799a6", weight: 4, opacity: 0.58, dashArray: "2 9", lineCap: "round", lineJoin: "round" }).addTo(mapLayers);
+  if (traveledRoute.length > 1) {
+    L.polyline(traveledRoute, { color: "#16a085", weight: 5, opacity: 0.96, lineCap: "round", lineJoin: "round" }).addTo(mapLayers);
+  }
+  const originIcon = L.divIcon({ className: "map-point-icon", html: '<span class="route-origin-marker"></span>', iconSize: [24, 32], iconAnchor: [12, 29] });
+  const destinationIcon = L.divIcon({
+    className: `map-point-icon${shipment.status === "Delivered" ? " is-delivered" : ""}`,
+    html: '<span class="route-destination-marker"></span>',
+    iconSize: [24, 32],
+    iconAnchor: [12, 29]
+  });
+  L.marker(points[0], { icon: originIcon }).bindTooltip(route[0].name || shipment.origin).addTo(mapLayers);
+  L.marker(points[points.length - 1], { icon: destinationIcon })
+    .bindTooltip(shipment.status === "Delivered" ? "Delivered" : route.at(-1).name || shipment.destination)
+    .addTo(mapLayers);
   const fallbackPosition = positionOnRoute(route, routeProgress);
   const gpsPosition = shipment.currentLocation &&
     Number.isFinite(shipment.currentLocation.latitude) &&
@@ -119,15 +157,35 @@ function renderMap(shipment, fitRoute) {
   const courierPosition = shipment.status === "Delivered"
     ? points.at(-1)
     : gpsPosition || fallbackPosition;
-  const courierIcon = L.divIcon({ className: "", html: '<span class="courier-map-marker"></span>', iconSize: [22, 22], iconAnchor: [11, 11] });
-  L.marker(courierPosition, { icon: courierIcon })
-    .bindTooltip("Your courier", { permanent: true, direction: "right", className: "courier-tooltip", offset: [12, 0] })
-    .addTo(mapLayers);
-  if (fitRoute) {
-    const visiblePoints = gpsPosition ? [...points, gpsPosition] : points;
-    map.fitBounds(L.latLngBounds(visiblePoints), { padding: [35, 35], maxZoom: 14 });
+  const markerState = shipment.status === "Delivered" ? "is-delivered" : gpsPosition ? "is-live" : "is-estimated";
+  const courierIcon = L.divIcon({
+    className: `courier-map-icon ${markerState}`,
+    html: '<span class="courier-marker-pulse"></span><span class="courier-map-marker"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12Z"/><circle cx="12" cy="9" r="2.3"/></svg></span>',
+    iconSize: [42, 48],
+    iconAnchor: [21, 26]
+  });
+  if (shipment.status !== "Delivered") {
+    L.marker(courierPosition, { icon: courierIcon })
+      .bindTooltip(gpsPosition ? "Courier GPS" : "Estimated courier position", {
+        permanent: true,
+        direction: "top",
+        className: "courier-tooltip",
+        offset: [0, -25]
+      })
+      .addTo(mapLayers);
   }
-  setTimeout(() => map.invalidateSize(), 0);
+  if (fitRoute) map.fitBounds(L.latLngBounds(points), { padding: [35, 35], maxZoom: 14 });
+  requestAnimationFrame(() => map.invalidateSize({ pan: false }));
+}
+
+if (map && mapViewport) {
+  const resizeMap = () => {
+    cancelAnimationFrame(mapResizeFrame);
+    mapResizeFrame = requestAnimationFrame(() => map.invalidateSize({ pan: false }));
+  };
+  if ("ResizeObserver" in window) new ResizeObserver(resizeMap).observe(mapViewport);
+  window.addEventListener("orientationchange", resizeMap);
+  window.visualViewport?.addEventListener("resize", resizeMap);
 }
 
 function renderShipment(shipment) {
@@ -154,13 +212,15 @@ function renderShipment(shipment) {
   const hasRoute = Array.isArray(shipment.route) && shipment.route.length > 1;
   document.querySelector("#tracking-mode").textContent = shipment.status === "Delivered" ? "DELIVERED" : shipment.currentLocation ? "COURIER GPS" : "SCAN UPDATES";
   document.querySelector(".map-header h3").textContent = shipment.status;
-  document.querySelector(".map-header p").textContent = shipment.currentLocation?.label ||
-    (shipment.status === "Delivered" ? "Your package has arrived" : hasRoute ? "Estimated route · awaiting courier GPS" : "Location updates appear after pickup");
+  document.querySelector(".map-header p").textContent = shipment.status === "Delivered"
+    ? "Delivery completed at destination"
+    : shipment.currentLocation?.label || (hasRoute ? "Estimated route · awaiting courier GPS" : "Location updates appear after pickup");
   document.querySelector("#map-tracking-mode").textContent =
     shipment.status === "Delivered" ? "DELIVERED" : shipment.currentLocation ? "COURIER GPS" : "ROUTE ESTIMATE";
-  document.querySelector("#courier-location").textContent = shipment.currentLocation?.updatedAt
-    ? `Updated ${formatTime(shipment.currentLocation.updatedAt)}`
-    : shipment.status === "Delivered" ? "Delivered at destination"
+  document.querySelector("#courier-location").textContent = shipment.status === "Delivered"
+    ? "Delivered at destination"
+    : shipment.currentLocation?.updatedAt
+      ? `Updated ${formatTime(shipment.currentLocation.updatedAt)}`
       : hasRoute ? "Estimated position · awaiting GPS" : "Awaiting first location scan";
   document.querySelector("#courier-distance-label").textContent =
     shipment.status === "Delivered" ? "Delivered" : shipment.currentLocation?.label ? "Live GPS" : hasRoute ? "Route estimate" : "Awaiting location";
