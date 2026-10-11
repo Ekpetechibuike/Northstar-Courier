@@ -15,6 +15,7 @@ let tileLoadErrors = 0;
 let displayedTrackingNumber;
 let trackingRequestId = 0;
 let mapResizeFrame = 0;
+let lastRenderedShipment = null;
 
 const demoTrackingNumber = "ST-8492-0317";
 const deliveryStatuses = ["Order placed", "Picked up", "In transit", "Out for delivery", "Delivered"];
@@ -52,11 +53,17 @@ function addMapTileLayer() {
     }
     mapEmptyState.textContent = mapTilesUnavailableMessage;
     mapEmptyState.hidden = false;
+    // Attempt a client-side static fallback when tile servers are unreachable
+    try { renderStaticFallback(lastRenderedShipment); } catch (e) { /* ignore */ }
   });
   tileLayer.on("tileload", () => {
     if (tileLayer !== sourceLayer) return;
     tileLoadErrors = 0;
     if (mapEmptyState.textContent === mapTilesUnavailableMessage) mapEmptyState.hidden = true;
+    try {
+      const fallback = document.querySelector('#live-map .static-map-fallback');
+      if (fallback) fallback.remove();
+    } catch (e) { }
   });
 }
 
@@ -169,6 +176,75 @@ function distanceToRoute(point, route) {
   return nearestDistance;
 }
 
+function renderStaticFallback(shipment) {
+  try {
+    const container = document.querySelector('#live-map');
+    if (!container) return;
+    const route = Array.isArray(shipment?.route) ? shipment.route.filter((p)=>Number.isFinite(p.lat)&&Number.isFinite(p.lng)) : [];
+    const gps = shipment?.currentLocation && Number.isFinite(shipment.currentLocation.latitude) && Number.isFinite(shipment.currentLocation.longitude)
+      ? { lat: shipment.currentLocation.latitude, lng: shipment.currentLocation.longitude }
+      : null;
+    const points = route.length ? route.map(p => ({ lat: p.lat, lng: p.lng })) : (gps ? [gps] : []);
+    if (points.length === 0) return;
+    let minLat = Math.min(...points.map(p=>p.lat));
+    let maxLat = Math.max(...points.map(p=>p.lat));
+    let minLng = Math.min(...points.map(p=>p.lng));
+    let maxLng = Math.max(...points.map(p=>p.lng));
+    // Add padding
+    const latPad = (maxLat - minLat) * 0.1 || 0.01;
+    const lngPad = (maxLng - minLng) * 0.1 || 0.01;
+    minLat -= latPad; maxLat += latPad; minLng -= lngPad; maxLng += lngPad;
+    const width = 1000; const height = 600;
+    function project(pt) {
+      const x = ((pt.lng - minLng) / (maxLng - minLng || 1)) * width;
+      const y = ((maxLat - pt.lat) / (maxLat - minLat || 1)) * height;
+      return { x, y };
+    }
+    const routePoints = route.map(p => project({ lat: p.lat, lng: p.lng }));
+    const polyPoints = routePoints.map(p => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' ');
+    const courierPoint = gps ? project(gps) : null;
+    const origin = routePoints[0];
+    const dest = routePoints[routePoints.length - 1];
+    const svgParts = [];
+    svgParts.push(`<svg xmlns='http://www.w3.org/2000/svg' width='${width}' height='${height}' viewBox='0 0 ${width} ${height}'>`);
+    svgParts.push(`<rect width='100%' height='100%' fill='#e6eef2'/>`);
+    if (polyPoints) svgParts.push(`<polyline points='${polyPoints}' fill='none' stroke='#8799a6' stroke-width='12' stroke-linecap='round' stroke-linejoin='round' opacity='0.9'/>`);
+    if (polyPoints) svgParts.push(`<polyline points='${polyPoints}' fill='none' stroke='#16a085' stroke-width='6' stroke-linecap='round' stroke-linejoin='round' opacity='0.95'/>`);
+    if (origin) svgParts.push(`<circle cx='${origin.x}' cy='${origin.y}' r='8' fill='#ffffff' stroke='#16a085' stroke-width='3'/>`);
+    if (dest) svgParts.push(`<circle cx='${dest.x}' cy='${dest.y}' r='8' fill='#ffffff' stroke='#8799a6' stroke-width='3'/>`);
+    if (courierPoint) svgParts.push(`<circle cx='${courierPoint.x}' cy='${courierPoint.y}' r='10' fill='#16a085' opacity='0.95'/>`);
+    svgParts.push(`</svg>`);
+    const svg = svgParts.join('');
+    const dataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+
+    // Ensure container can position absolute children
+    const prevPosition = container.style.position;
+    if (!prevPosition || prevPosition === 'static') container.style.position = 'relative';
+
+    // Remove any existing fallback overlay
+    const existing = container.querySelector('.static-map-fallback');
+    if (existing) existing.remove();
+
+    const img = document.createElement('img');
+    img.className = 'static-map-fallback';
+    img.src = dataUrl;
+    img.alt = 'Fallback static map showing estimated route and courier position';
+    img.style.position = 'absolute';
+    img.style.left = '0';
+    img.style.top = '0';
+    img.style.width = '100%';
+    img.style.height = '100%';
+    img.style.objectFit = 'cover';
+    img.style.pointerEvents = 'none';
+    img.style.zIndex = '400';
+
+    container.appendChild(img);
+    if (mapEmptyState) { mapEmptyState.hidden = true; }
+  } catch (e) {
+    // swallow
+  }
+}
+
 function renderMap(shipment, fitRoute) {
   const route = Array.isArray(shipment.route)
     ? shipment.route.filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng))
@@ -259,6 +335,7 @@ if (map && mapViewport) {
 }
 
 function renderShipment(shipment) {
+  lastRenderedShipment = shipment;
   const isNewShipment = displayedTrackingNumber !== shipment.trackingNumber;
   displayedTrackingNumber = shipment.trackingNumber;
   document.querySelector("#shipment-recipient").textContent = shipment.recipient;
@@ -473,3 +550,61 @@ const requestedTrackingNumber = new URLSearchParams(window.location.search).get(
 const initialTrackingNumber = requestedTrackingNumber || demoTrackingNumber;
 trackingInput.value = initialTrackingNumber;
 trackShipment(initialTrackingNumber);
+
+// Debug overlay: visit the tracking page with ?debug=true on your phone to show diagnostics and copy them to clipboard
+if (new URLSearchParams(window.location.search).get("debug") === "true") {
+  (function showDebugOverlay() {
+    const info = () => ({
+      leaflet: !!window.L,
+      leafletVersion: window.L && window.L.version ? window.L.version : null,
+      tileSource: tileLayer && tileLayer.options ? tileLayer.options.url : null,
+      tileCount: document.querySelectorAll('.leaflet-tile').length,
+      mapEmptyHidden: !!(mapEmptyState && mapEmptyState.hidden),
+      mapRect: (() => { try { const r = document.querySelector('#live-map')?.getBoundingClientRect(); return r ? { x: r.x, y: r.y, width: r.width, height: r.height } : null; } catch(e){ return null; } })(),
+      location: location.href,
+      online: navigator.onLine
+    });
+
+    const overlay = document.createElement('div');
+    overlay.id = 'debug-overlay';
+    overlay.style.position = 'fixed';
+    overlay.style.right = '10px';
+    overlay.style.bottom = '10px';
+    overlay.style.zIndex = '99999';
+    overlay.style.background = 'rgba(0,0,0,0.8)';
+    overlay.style.color = '#fff';
+    overlay.style.padding = '10px';
+    overlay.style.borderRadius = '8px';
+    overlay.style.fontSize = '12px';
+    overlay.style.maxWidth = '320px';
+    overlay.style.maxHeight = '60vh';
+    overlay.style.overflow = 'auto';
+
+    const pre = document.createElement('pre');
+    pre.style.margin = '0 0 8px 0';
+    pre.style.whiteSpace = 'pre-wrap';
+    pre.style.wordBreak = 'break-word';
+
+    const btn = document.createElement('button');
+    btn.textContent = 'Refresh debug info';
+    btn.style.marginRight = '8px';
+    btn.addEventListener('click', () => { pre.textContent = JSON.stringify(info(), null, 2); });
+
+    const copy = document.createElement('button');
+    copy.textContent = 'Copy';
+    copy.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(pre.textContent);
+        copy.textContent = 'Copied';
+        setTimeout(() => copy.textContent = 'Copy', 2000);
+      } catch (e) {
+        copy.textContent = 'Copy failed';
+        setTimeout(() => copy.textContent = 'Copy', 2000);
+      }
+    });
+
+    overlay.append(pre, btn, copy);
+    document.body.appendChild(overlay);
+    pre.textContent = JSON.stringify(info(), null, 2);
+  })();
+}
