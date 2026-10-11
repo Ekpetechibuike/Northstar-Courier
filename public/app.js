@@ -101,6 +101,31 @@ function routePrefix(route, progress) {
   return prefix;
 }
 
+function distanceToRoute(point, route) {
+  const metersPerDegree = 111_320;
+  const longitudeScale = metersPerDegree * Math.cos(point.lat * Math.PI / 180);
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  for (let index = 0; index < route.length - 1; index += 1) {
+    const start = route[index];
+    const end = route[index + 1];
+    const startX = (start.lng - point.lng) * longitudeScale;
+    const startY = (start.lat - point.lat) * metersPerDegree;
+    const endX = (end.lng - point.lng) * longitudeScale;
+    const endY = (end.lat - point.lat) * metersPerDegree;
+    const segmentX = endX - startX;
+    const segmentY = endY - startY;
+    const segmentLengthSquared = segmentX * segmentX + segmentY * segmentY;
+    const fraction = segmentLengthSquared
+      ? Math.max(0, Math.min(1, -(startX * segmentX + startY * segmentY) / segmentLengthSquared))
+      : 0;
+    nearestDistance = Math.min(nearestDistance, Math.hypot(
+      startX + fraction * segmentX,
+      startY + fraction * segmentY
+    ));
+  }
+  return nearestDistance;
+}
+
 function renderMap(shipment, fitRoute) {
   const route = Array.isArray(shipment.route)
     ? shipment.route.filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng))
@@ -174,7 +199,14 @@ function renderMap(shipment, fitRoute) {
       })
       .addTo(mapLayers);
   }
-  if (fitRoute) map.fitBounds(L.latLngBounds(points), { padding: [35, 35], maxZoom: 14 });
+  if (fitRoute) {
+    if (gpsPosition && distanceToRoute(gpsPosition, points) > 50_000) {
+      map.setView(gpsPosition, 12);
+    } else {
+      const visiblePoints = gpsPosition && shipment.status !== "Delivered" ? [...points, gpsPosition] : points;
+      map.fitBounds(L.latLngBounds(visiblePoints), { padding: [35, 35], maxZoom: 14 });
+    }
+  }
   requestAnimationFrame(() => map.invalidateSize({ pan: false }));
 }
 
