@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101f2d">
+  <meta name="description" content="Authorized staff sign-in for Northstar Courier operations.">
+  <title>Staff sign-in — Northstar</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script src="courier-login.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Northstar home">
+      <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M16 2.8 19.2 12.8 29.2 16l-10 3.2L16 29.2l-3.2-10L2.8 16l10-3.2L16 2.8Z" fill="currentColor"/><circle cx="16" cy="16" r="3.1" fill="#fff"/></svg></span>
+      <span>Northstar<span class="brand-period">.</span></span>
+    </a>
+    <nav class="nav-links" aria-label="Main navigation">
+      <a href="/">Track shipment</a>
+      <a href="/#send-package">Create shipment</a>
+    </nav>
+  </header>
+  <main class="courier-main courier-login-main">
+    <section class="courier-intro">
+      <div class="eyebrow"><span class="eyebrow-dot"></span> AUTHORIZED STAFF ONLY</div>
+      <h1>Courier sign-in<span class="heading-period">.</span></h1>
+      <p>Sign in with the private portal password provided by the Northstar administrator.</p>
+    </section>
+    <section class="courier-panel courier-login-panel" aria-labelledby="courier-login-heading">
+      <div class="courier-panel-heading">
+        <div>
+          <span class="courier-step">SECURE PORTAL</span>
+          <h2 id="courier-login-heading">Enter portal password</h2>
+        </div>
+      </div>
+      <form class="courier-form" id="courier-login-form">
+        <div class="courier-field">
+          <label for="courier-password">Portal password</label>
+          <input id="courier-password" name="password" type="password" autocomplete="current-password" minlength="16" maxlength="1024" required autofocus>
+          <span class="courier-help">Ask the administrator for the password. The portal requires at least 16 characters and three character types.</span>
+        </div>
+        <button type="submit" id="courier-login-button">Sign in <span aria-hidden="true">→</span></button>
+        <p class="courier-message" id="courier-login-message" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+  </main>
+  <footer class="footer">
+    <a class="brand footer-brand" href="/"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M16 2.8 19.2 12.8 29.2 16l-10 3.2L16 29.2l-3.2-10L2.8 16l10-3.2L16 2.8Z" fill="currentColor"/><circle cx="16" cy="16" r="3.1" fill="#fff"/></svg></span><span>northstar<span class="brand-period">.</span></span></a>
+    <span>Authorized courier operations</span>
+    <span><a href="/">Customer tracking</a> · © 2026 Northstar Courier</span>
+  </footer>
+</body>
+</html>

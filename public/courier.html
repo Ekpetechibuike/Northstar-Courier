@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101f2d">
+  <meta name="description" content="Secure Northstar Courier staff tools for updating shipment progress and courier GPS.">
+  <title>Courier portal — Northstar</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script src="courier.js" defer></script>
+</head>
+<body class="courier-page">
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Northstar home">
+      <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M16 2.8 19.2 12.8 29.2 16l-10 3.2L16 29.2l-3.2-10L2.8 16l10-3.2L16 2.8Z" fill="currentColor"/><circle cx="16" cy="16" r="3.1" fill="#fff"/></svg></span>
+      <span>Northstar<span class="brand-period">.</span></span>
+    </a>
+    <nav class="nav-links" aria-label="Main navigation">
+      <a href="/">Track shipment</a>
+      <a href="/#send-package">Create shipment</a>
+      <a class="courier-inbox-nav" href="#courier-support-inbox">Support inbox</a>
+      <button type="button" class="courier-logout-button" id="courier-logout">Sign out</button>
+    </nav>
+  </header>
+  <main class="courier-main">
+    <section class="courier-intro">
+      <div class="eyebrow"><span class="eyebrow-dot"></span> STAFF TOOLS</div>
+      <h1>Courier portal<span class="heading-period">.</span></h1>
+      <p>Review customer support messages, advance delivery statuses, and send courier GPS updates to the tracking page.</p>
+    </section>
+
+    <section class="courier-panel courier-inbox-panel" id="courier-support-inbox" aria-labelledby="courier-inbox-heading">
+      <div class="courier-panel-heading">
+        <div>
+          <span class="courier-step">PRIVATE ADMIN INBOX</span>
+          <h2 id="courier-inbox-heading">Customer support messages <span class="courier-inbox-count" id="courier-inbox-count">0 new</span></h2>
+        </div>
+        <button type="button" class="courier-secondary-button courier-refresh-button" id="courier-inbox-refresh">Refresh inbox</button>
+      </div>
+      <div class="courier-inbox-toolbar">
+        <label for="courier-inbox-filter">Show</label>
+        <select id="courier-inbox-filter">
+          <option value="all">All messages</option>
+          <option value="new">New messages</option>
+          <option value="resolved">Resolved messages</option>
+        </select>
+      </div>
+      <p class="courier-message" id="courier-inbox-message" role="status" aria-live="polite"></p>
+      <div class="courier-inbox-list" id="courier-inbox-list"></div>
+    </section>
+
+    <section class="courier-panel" aria-labelledby="courier-access-heading">
+      <div class="courier-panel-heading">
+        <div>
+          <span class="courier-step">01 · SECURE ACCESS</span>
+          <h2 id="courier-access-heading">Find a shipment</h2>
+        </div>
+      </div>
+      <form id="courier-lookup-form" class="courier-form">
+        <div class="courier-form-grid">
+          <div class="courier-field">
+            <label for="courier-tracking-number">Tracking number</label>
+            <input id="courier-tracking-number" type="text" maxlength="64" placeholder="ST-0000-0000" autocomplete="off" required>
+          </div>
+        </div>
+        <button type="submit" id="courier-lookup-button">Load shipment <span aria-hidden="true">→</span></button>
+        <p class="courier-message" id="courier-lookup-message" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+
+    <section class="courier-panel courier-shipment-panel" id="courier-shipment-panel" hidden aria-labelledby="courier-shipment-heading">
+      <div class="courier-panel-heading">
+        <div>
+          <span class="courier-step">SHIPMENT DETAILS</span>
+          <h2 id="courier-shipment-heading">Shipment loaded</h2>
+        </div>
+        <span class="courier-status" id="courier-current-status"></span>
+      </div>
+      <div class="courier-route-summary">
+        <div><span>TRACKING</span><strong id="courier-detail-tracking"></strong></div>
+        <div><span>RECIPIENT</span><strong id="courier-detail-recipient"></strong></div>
+        <div><span>PICKUP</span><strong id="courier-detail-origin"></strong></div>
+        <div><span>DELIVERY</span><strong id="courier-detail-destination"></strong></div>
+      </div>
+
+      <form id="courier-status-form" class="courier-form courier-action-form">
+        <div>
+          <span class="courier-step">02 · DELIVERY PROGRESS</span>
+          <h3>Advance shipment status</h3>
+          <p class="courier-help">Statuses must be completed in order. The tracking page refreshes automatically.</p>
+        </div>
+        <div class="courier-form-grid">
+          <div class="courier-field">
+            <label for="courier-next-status">Next delivery step</label>
+            <select id="courier-next-status" required></select>
+          </div>
+          <div class="courier-field">
+            <label for="courier-status-location">Scan location</label>
+            <input id="courier-status-location" type="text" maxlength="120" required placeholder="City, depot, or delivery address">
+          </div>
+        </div>
+        <button type="submit" id="courier-status-button">Update delivery status</button>
+        <p class="courier-message" id="courier-status-message" role="status" aria-live="polite"></p>
+      </form>
+
+      <form id="courier-location-form" class="courier-form courier-action-form">
+        <div>
+          <span class="courier-step">03 · COURIER GPS</span>
+          <h3>Send current location</h3>
+          <p class="courier-help">Allow location access on your device or enter coordinates manually. This updates the live courier marker.</p>
+        </div>
+        <div class="courier-form-grid courier-coordinate-grid">
+          <div class="courier-field">
+            <label for="courier-latitude">Latitude</label>
+            <input id="courier-latitude" type="number" min="-90" max="90" step="any" required placeholder="6.5244">
+          </div>
+          <div class="courier-field">
+            <label for="courier-longitude">Longitude</label>
+            <input id="courier-longitude" type="number" min="-180" max="180" step="any" required placeholder="3.3792">
+          </div>
+          <div class="courier-field">
+            <label for="courier-gps-label">Location label</label>
+            <input id="courier-gps-label" type="text" maxlength="120" required placeholder="Current area or address">
+          </div>
+        </div>
+        <div class="courier-button-row">
+          <button type="button" class="courier-secondary-button" id="courier-use-gps">Use this device's GPS</button>
+          <button type="submit" id="courier-location-button">Send location update</button>
+        </div>
+        <p class="courier-message" id="courier-location-message" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+  </main>
+  <footer class="footer">
+    <a class="brand footer-brand" href="/"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M16 2.8 19.2 12.8 29.2 16l-10 3.2L16 29.2l-3.2-10L2.8 16l10-3.2L16 2.8Z" fill="currentColor"/><circle cx="16" cy="16" r="3.1" fill="#fff"/></svg></span><span>northstar<span class="brand-period">.</span></span></a>
+    <span>Courier operations</span>
+    <span><a href="/">Customer tracking</a> · © 2026 Northstar Courier</span>
+  </footer>
+</body>
+</html>
