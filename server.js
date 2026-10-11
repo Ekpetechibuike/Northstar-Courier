@@ -622,6 +622,9 @@ async function handleRequest(request, response) {
   }
   try {
     const file = await readFile(filePath);
+    if ([".html", ".js", ".css"].includes(extname(filePath))) {
+      response.setHeader("Cache-Control", "no-cache");
+    }
     response.writeHead(200, { "Content-Type": mimeTypes[extname(filePath)] || "application/octet-stream" });
     response.end(request.method === "HEAD" ? undefined : file);
   } catch (error) {
