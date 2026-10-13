@@ -72,7 +72,14 @@
         <div class="tracking-layout">
           <article class="shipment-card">
             <div class="card-topline">
-              <div class="shipment-title"><span class="package-icon"><svg viewBox="0 0 24 24"><path d="m3.5 7.5 8.5-4 8.5 4v9l-8.5 4-8.5-4v-9Z M3.5 7.5 12 12l8.5-4.5M12 12v8.5M8 5.4l8.5 4.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span><div><h3 id="shipment-recipient">Jordan Lee</h3><p>Tracking <span id="shipment-number">ST-8492-0317</span></p></div></div>
+              <div class="shipment-title">
+                <span class="recipient-avatar" id="recipient-avatar" aria-hidden="true">JL</span>
+                <div class="recipient-copy">
+                  <span class="recipient-label">RECIPIENT</span>
+                  <h3 id="shipment-recipient">Jordan Lee</h3>
+                  <p><span class="tracking-number-label">TRACKING</span><span id="shipment-number">ST-8492-0317</span></p>
+                </div>
+              </div>
               <span class="status-pill" id="shipment-status-pill"><span></span><span id="shipment-status">Out for delivery</span></span>
             </div>
             <div class="route-summary">
