@@ -6,6 +6,7 @@ const shareTrackingButton = document.querySelector("#share-tracking");
 const shareLinkMessage = document.querySelector("#share-link-message");
 const timeline = document.querySelector("#timeline-list");
 const mapEmptyState = document.querySelector("#map-empty-state");
+const mapPreviewState = document.querySelector("#map-preview-state");
 const map = window.L ? L.map("live-map", { zoomControl: false, scrollWheelZoom: false }).setView([0, 0], 2) : null;
 const mapLayers = map ? L.layerGroup().addTo(map) : null;
 const mapViewport = document.querySelector("#map-viewport");
@@ -13,6 +14,8 @@ let mapRouteBounds;
 let tileLayer;
 let tileSourceIndex = -1;
 let tileLoadErrors = 0;
+let tileLoadCount = 0;
+let tileFallbackTimer;
 let displayedTrackingNumber;
 let trackingRequestId = 0;
 let mapResizeFrame = 0;
@@ -26,7 +29,12 @@ const mapTileSources = [
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
   }
 ];
-const mapTilesUnavailableMessage = "Map tiles could not be loaded. Check your internet connection and try again.";
+function showStaticMapFallback(shipment) {
+  if (!shipment) return;
+  renderStaticFallback(shipment);
+  mapPreviewState.hidden = false;
+  mapEmptyState.hidden = true;
+}
 
 function addMapTileLayer() {
   tileSourceIndex += 1;
@@ -38,28 +46,27 @@ function addMapTileLayer() {
     ...(source.subdomains ? { subdomains: source.subdomains } : {})
   }).addTo(map);
   tileLayer = sourceLayer;
+  tileFallbackTimer = window.setTimeout(() => {
+    if (tileLayer === sourceLayer && tileLoadCount === 0) showStaticMapFallback(lastRenderedShipment);
+  }, 8000);
   tileLayer.on("tileerror", () => {
     if (tileLayer !== sourceLayer) return;
     tileLoadErrors += 1;
-    if (tileLoadErrors < 3) return;
+    if (tileLoadErrors < 3 || tileLoadCount > 0) return;
     if (tileSourceIndex < mapTileSources.length - 1) {
       map.removeLayer(tileLayer);
       addMapTileLayer();
       return;
     }
-    mapEmptyState.textContent = mapTilesUnavailableMessage;
-    mapEmptyState.hidden = false;
-    // Attempt a client-side static fallback when tile servers are unreachable
-    try { renderStaticFallback(lastRenderedShipment); } catch (e) { /* ignore */ }
+    showStaticMapFallback(lastRenderedShipment);
   });
   tileLayer.on("tileload", () => {
     if (tileLayer !== sourceLayer) return;
-    tileLoadErrors = 0;
-    if (mapEmptyState.textContent === mapTilesUnavailableMessage) mapEmptyState.hidden = true;
-    try {
-      const fallback = document.querySelector('#live-map .static-map-fallback');
-      if (fallback) fallback.remove();
-    } catch (e) { }
+    tileLoadCount += 1;
+    window.clearTimeout(tileFallbackTimer);
+    mapEmptyState.hidden = true;
+    mapPreviewState.hidden = true;
+    document.querySelector("#live-map .static-map-fallback")?.remove();
   });
 }
 
@@ -173,72 +180,117 @@ function distanceToRoute(point, route) {
 }
 
 function renderStaticFallback(shipment) {
-  try {
-    const container = document.querySelector('#live-map');
-    if (!container) return;
-    const route = Array.isArray(shipment?.route) ? shipment.route.filter((p)=>Number.isFinite(p.lat)&&Number.isFinite(p.lng)) : [];
-    const gps = shipment?.currentLocation && Number.isFinite(shipment.currentLocation.latitude) && Number.isFinite(shipment.currentLocation.longitude)
-      ? { lat: shipment.currentLocation.latitude, lng: shipment.currentLocation.longitude }
-      : null;
-    const points = route.length ? route.map(p => ({ lat: p.lat, lng: p.lng })) : (gps ? [gps] : []);
-    if (points.length === 0) return;
-    let minLat = Math.min(...points.map(p=>p.lat));
-    let maxLat = Math.max(...points.map(p=>p.lat));
-    let minLng = Math.min(...points.map(p=>p.lng));
-    let maxLng = Math.max(...points.map(p=>p.lng));
-    // Add padding
-    const latPad = (maxLat - minLat) * 0.1 || 0.01;
-    const lngPad = (maxLng - minLng) * 0.1 || 0.01;
-    minLat -= latPad; maxLat += latPad; minLng -= lngPad; maxLng += lngPad;
-    const width = 1000; const height = 600;
-    function project(pt) {
-      const x = ((pt.lng - minLng) / (maxLng - minLng || 1)) * width;
-      const y = ((maxLat - pt.lat) / (maxLat - minLat || 1)) * height;
-      return { x, y };
+  const container = document.querySelector("#live-map");
+  if (!container) return;
+  const route = Array.isArray(shipment.route)
+    ? shipment.route.filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng))
+    : [];
+  if (route.length < 2) return;
+
+  const statusIndex = deliveryStatuses.indexOf(shipment.status);
+  const progress = statusIndex < 0 ? 0 : statusIndex / (deliveryStatuses.length - 1);
+  const traveled = [];
+  const latitudeCenter = route.reduce((sum, point) => sum + point.lat, 0) / route.length;
+  const longitudeScale = Math.cos(latitudeCenter * Math.PI / 180);
+  let routeLength = 0;
+  const segmentLengths = route.slice(1).map((point, index) => {
+    const distance = Math.hypot(
+      point.lat - route[index].lat,
+      (point.lng - route[index].lng) * longitudeScale
+    );
+    routeLength += distance;
+    return distance;
+  });
+  let remaining = routeLength * progress;
+  traveled.push(route[0]);
+  for (let index = 0; index < segmentLengths.length; index += 1) {
+    const segmentLength = segmentLengths[index];
+    if (remaining <= segmentLength) {
+      const fraction = segmentLength ? remaining / segmentLength : 0;
+      traveled.push({
+        lat: route[index].lat + (route[index + 1].lat - route[index].lat) * fraction,
+        lng: route[index].lng + (route[index + 1].lng - route[index].lng) * fraction
+      });
+      break;
     }
-    const routePoints = route.map(p => project({ lat: p.lat, lng: p.lng }));
-    const polyPoints = routePoints.map(p => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' ');
-    const courierPoint = gps ? project(gps) : null;
-    const origin = routePoints[0];
-    const dest = routePoints[routePoints.length - 1];
-    const svgParts = [];
-    svgParts.push(`<svg xmlns='http://www.w3.org/2000/svg' width='${width}' height='${height}' viewBox='0 0 ${width} ${height}'>`);
-    svgParts.push(`<rect width='100%' height='100%' fill='#e6eef2'/>`);
-    if (polyPoints) svgParts.push(`<polyline points='${polyPoints}' fill='none' stroke='#8799a6' stroke-width='12' stroke-linecap='round' stroke-linejoin='round' opacity='0.9'/>`);
-    if (polyPoints) svgParts.push(`<polyline points='${polyPoints}' fill='none' stroke='#16a085' stroke-width='6' stroke-linecap='round' stroke-linejoin='round' opacity='0.95'/>`);
-    if (origin) svgParts.push(`<circle cx='${origin.x}' cy='${origin.y}' r='8' fill='#ffffff' stroke='#16a085' stroke-width='3'/>`);
-    if (dest) svgParts.push(`<circle cx='${dest.x}' cy='${dest.y}' r='8' fill='#ffffff' stroke='#8799a6' stroke-width='3'/>`);
-    if (courierPoint) svgParts.push(`<circle cx='${courierPoint.x}' cy='${courierPoint.y}' r='10' fill='#16a085' opacity='0.95'/>`);
-    svgParts.push(`</svg>`);
-    const svg = svgParts.join('');
-    const dataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-
-    // Ensure container can position absolute children
-    const prevPosition = container.style.position;
-    if (!prevPosition || prevPosition === 'static') container.style.position = 'relative';
-
-    // Remove any existing fallback overlay
-    const existing = container.querySelector('.static-map-fallback');
-    if (existing) existing.remove();
-
-    const img = document.createElement('img');
-    img.className = 'static-map-fallback';
-    img.src = dataUrl;
-    img.alt = 'Fallback static map showing estimated route and courier position';
-    img.style.position = 'absolute';
-    img.style.left = '0';
-    img.style.top = '0';
-    img.style.width = '100%';
-    img.style.height = '100%';
-    img.style.objectFit = 'cover';
-    img.style.pointerEvents = 'none';
-    img.style.zIndex = '400';
-
-    container.appendChild(img);
-    if (mapEmptyState) { mapEmptyState.hidden = true; }
-  } catch (e) {
-    // swallow
+    traveled.push(route[index + 1]);
+    remaining -= segmentLength;
   }
+  if (shipment.status === "Delivered") traveled.splice(0, traveled.length, ...route);
+
+  const width = Math.max(container.clientWidth, 320);
+  const height = Math.max(container.clientHeight, 280);
+  const projected = route.map((point) => ({
+    x: point.lng * longitudeScale,
+    y: point.lat
+  }));
+  const minX = Math.min(...projected.map((point) => point.x));
+  const maxX = Math.max(...projected.map((point) => point.x));
+  const minY = Math.min(...projected.map((point) => point.y));
+  const maxY = Math.max(...projected.map((point) => point.y));
+  const routeWidth = maxX - minX || 0.01;
+  const routeHeight = maxY - minY || 0.01;
+  const scale = Math.min((width - 220) / routeWidth, (height - 190) / routeHeight);
+  const project = (point) => ({
+    x: width / 2 + (point.lng * longitudeScale - (minX + maxX) / 2) * scale,
+    y: height / 2 - (point.lat - (minY + maxY) / 2) * scale
+  });
+  const routePoints = route.map(project);
+  const traveledPoints = traveled.map(project);
+  const polyline = (points) => points.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ");
+  const latitudes = route.map((point) => point.lat);
+  const longitudes = route.map((point) => point.lng);
+  const gps = shipment.status !== "Delivered" && shipment.currentLocation &&
+    Number.isFinite(shipment.currentLocation.latitude) && Number.isFinite(shipment.currentLocation.longitude)
+    ? { lat: shipment.currentLocation.latitude, lng: shipment.currentLocation.longitude }
+    : null;
+  const courierCandidate = project(gps || (shipment.status === "Delivered" ? route[route.length - 1] : traveled[traveled.length - 1]));
+  const courier = courierCandidate.x >= 40 && courierCandidate.x <= width - 40 &&
+    courierCandidate.y >= 40 && courierCandidate.y <= height - 40
+    ? courierCandidate
+    : project(traveled[traveled.length - 1]);
+  const escapeSvgText = (value) => String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+  const svgParts = [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
+    "<defs><pattern id=\"road-grid\" width=\"84\" height=\"84\" patternUnits=\"userSpaceOnUse\" patternTransform=\"rotate(-18)\"><path d=\"M0 21H84M0 63H84\" fill=\"none\" stroke=\"#dce5df\" stroke-width=\"8\"/><path d=\"M21 0V84M63 0V84\" fill=\"none\" stroke=\"#e4ebe5\" stroke-width=\"5\"/><path d=\"M0 21H84M0 63H84\" fill=\"none\" stroke=\"#f8faf8\" stroke-width=\"2\"/></pattern></defs>",
+    `<rect width="${width}" height="${height}" fill="#edf3ef"/>`,
+    `<rect width="${width}" height="${height}" fill="url(#road-grid)"/>`,
+    `<path d="M-50 475 C180 390 250 520 440 430 S720 300 1050 365" fill="none" stroke="#d6e8ed" stroke-width="42" opacity=".85"/>`,
+    `<path d="M-50 475 C180 390 250 520 440 430 S720 300 1050 365" fill="none" stroke="#f7fbfc" stroke-width="30"/>`,
+    `<polyline points="${polyline(routePoints)}" fill="none" stroke="#fff" stroke-width="17" stroke-linecap="round" stroke-linejoin="round"/>`,
+    `<polyline points="${polyline(routePoints)}" fill="none" stroke="#9bb3a4" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>`,
+    `<polyline points="${polyline(routePoints)}" fill="none" stroke="#cedbd2" stroke-width="4" stroke-dasharray="3 12" stroke-linecap="round" stroke-linejoin="round"/>`
+  ];
+  if (traveledPoints.length > 1) {
+    svgParts.push(`<polyline points="${polyline(traveledPoints)}" fill="none" stroke="#33805a" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>`);
+  }
+  const origin = routePoints[0];
+  const destination = routePoints[routePoints.length - 1];
+  svgParts.push(
+    `<circle cx="${origin.x}" cy="${origin.y}" r="15" fill="#fff" stroke="#33805a" stroke-width="5"/>`,
+    `<circle cx="${origin.x}" cy="${origin.y}" r="5" fill="#33805a"/>`,
+    `<circle cx="${destination.x}" cy="${destination.y}" r="15" fill="#fff" stroke="#e96c3c" stroke-width="5"/>`,
+    `<circle cx="${destination.x}" cy="${destination.y}" r="5" fill="#e96c3c"/>`,
+    `<circle cx="${courier.x}" cy="${courier.y}" r="24" fill="#e96c3c" opacity=".16"/>`,
+    `<circle cx="${courier.x}" cy="${courier.y}" r="12" fill="#e96c3c" stroke="#fff" stroke-width="5"/>`,
+    `<text x="${origin.x + 22}" y="${origin.y - 17}" fill="#314b3c" font-family="Arial,sans-serif" font-size="17" font-weight="700">${escapeSvgText(route[0].name || shipment.origin)}</text>`,
+    `<text x="${destination.x + 22}" y="${destination.y - 17}" fill="#314b3c" font-family="Arial,sans-serif" font-size="17" font-weight="700">${escapeSvgText(route[route.length - 1].name || shipment.destination)}</text>`,
+    "</svg>"
+  );
+  const dataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgParts.join(""))}`;
+  container.querySelector(".static-map-fallback")?.remove();
+  const image = document.createElement("img");
+  image.className = "static-map-fallback";
+  image.src = dataUrl;
+  image.alt = `Route preview from ${route[0].name || shipment.origin} to ${route[route.length - 1].name || shipment.destination}`;
+  image.style.position = "absolute";
+  image.style.inset = "0";
+  image.style.width = "100%";
+  image.style.height = "100%";
+  image.style.objectFit = "cover";
+  image.style.pointerEvents = "none";
+  image.style.zIndex = "400";
+  container.appendChild(image);
 }
 
 function renderMap(shipment, fitRoute) {
@@ -250,13 +302,19 @@ function renderMap(shipment, fitRoute) {
   document.querySelectorAll(".map-zoom button").forEach((button) => {
     button.disabled = !hasMapRoute;
   });
+  mapPreviewState.hidden = true;
   if (!map) {
-    mapEmptyState.textContent = "The live map is temporarily unavailable. Shipment tracking is still active.";
-    mapEmptyState.hidden = false;
+    if (route.length > 1) {
+      showStaticMapFallback(shipment);
+    } else {
+      mapEmptyState.textContent = "The map is temporarily unavailable and this shipment has no saved route. Tracking updates are still active.";
+      mapEmptyState.hidden = false;
+    }
     return;
   }
   mapLayers.clearLayers();
   if (route.length < 2) {
+    document.querySelector("#live-map .static-map-fallback")?.remove();
     mapEmptyState.textContent = "The route is unavailable. Check the pickup and delivery locations.";
     mapEmptyState.hidden = false;
     return;
