@@ -23,11 +23,6 @@ const mapTileSources = [
   {
     url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-  },
-  {
-    url: "https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",
-    subdomains: "abc",
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, tiles &copy; HOT'
   }
 ];
 const mapTilesUnavailableMessage = "Map tiles could not be loaded. Check your internet connection and try again.";
@@ -216,10 +211,6 @@ function renderStaticFallback(shipment) {
     svgParts.push(`</svg>`);
     const svg = svgParts.join('');
     const dataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-
-    // Ensure container can position absolute children
-    const prevPosition = container.style.position;
-    if (!prevPosition || prevPosition === 'static') container.style.position = 'relative';
 
     // Remove any existing fallback overlay
     const existing = container.querySelector('.static-map-fallback');
