@@ -29,6 +29,7 @@ const mimeTypes = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
+  ".png": "image/png",
   ".svg": "image/svg+xml"
 };
 
@@ -616,8 +617,9 @@ async function handleRequest(request, response) {
   }
 
   const relativePath = path === "/" ? "index.html" : normalize(path.replace(/^\/+/, ""));
-  const filePath = resolve(publicRoot, relativePath);
-  if (filePath !== publicRoot && !filePath.startsWith(`${publicRoot}${sep}`)) {
+  const assetRoot = publicRoot;
+  const filePath = resolve(assetRoot, relativePath);
+  if (filePath !== assetRoot && !filePath.startsWith(`${assetRoot}${sep}`)) {
     return json(response, 403, { error: "Access denied." });
   }
   try {
