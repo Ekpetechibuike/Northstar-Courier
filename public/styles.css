@@ -59,12 +59,18 @@ h1, h2, h3, p { margin: 0; }
 .shipment-card, .map-card { overflow: hidden; border: 1px solid #e9ece8; border-radius: 11px; background: var(--paper); box-shadow: 0 4px 18px #27372b08; }
 .shipment-card { padding: 19px 22px 0; }
 .card-topline { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.shipment-title { display: flex; align-items: center; gap: 10px; }
+.shipment-title { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.recipient-avatar { display: grid; place-items: center; width: 44px; height: 44px; flex: none; border: 1px solid #f4d9cc; border-radius: 14px; color: #bd572f; background: linear-gradient(145deg, #fff5ef, #ffe6da); box-shadow: inset 0 1px 0 #fff; font-family: var(--font-display); font-size: 14px; font-weight: 800; letter-spacing: -.5px; }
+.recipient-copy { min-width: 0; }
+.recipient-label { display: block; color: #84919b; font-size: 8px; font-weight: 700; letter-spacing: 1.15px; }
 .package-icon { display: grid; place-items: center; height: 37px; width: 37px; color: var(--green); background: #eff5f0; border-radius: 9px; }
 .package-icon svg { width: 23px; height: 23px; }
 .shipment-title h3, .map-header h3 { font-family: var(--font-display); font-size: 13px; font-weight: 700; }
+.shipment-title .recipient-copy h3 { margin-top: 3px; color: #1b2e3d; font-size: 17px; font-weight: 800; letter-spacing: -.55px; line-height: 1.2; overflow-wrap: anywhere; }
 .shipment-title p { margin-top: 4px; color: #949d96; font-size: 9px; }
 .shipment-title p span { color: #66736a; font-weight: 700; letter-spacing: .35px; }
+.shipment-title .recipient-copy p { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 5px; color: #526270; font-size: 9px; }
+.shipment-title .recipient-copy p .tracking-number-label { color: #8996a0; font-size: 7px; font-weight: 700; letter-spacing: .8px; }
 .status-pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 100px; background: #edf6ef; color: #34734d; font-size: 8px; font-weight: 700; white-space: nowrap; }
 .status-pill > span:first-child { width: 5px; height: 5px; background: #57a972; border-radius: 50%; }
 .route-summary { margin: 19px 0 17px; padding: 12px 12px 13px; display: grid; grid-template-columns: 1fr 45px 1fr; align-items: center; border-radius: 8px; background: #f8f9f7; }
