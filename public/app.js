@@ -9,6 +9,7 @@ const mapEmptyState = document.querySelector("#map-empty-state");
 const map = window.L ? L.map("live-map", { zoomControl: false, scrollWheelZoom: false }).setView([0, 0], 2) : null;
 const mapLayers = map ? L.layerGroup().addTo(map) : null;
 const mapViewport = document.querySelector("#map-viewport");
+let mapRouteBounds;
 let tileLayer;
 let tileSourceIndex = -1;
 let tileLoadErrors = 0;
@@ -23,11 +24,6 @@ const mapTileSources = [
   {
     url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-  },
-  {
-    url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-    subdomains: "abcd",
-    attribution: '&copy; OpenStreetMap contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
   }
 ];
 const mapTilesUnavailableMessage = "Map tiles could not be loaded. Check your internet connection and try again.";
@@ -271,21 +267,21 @@ function renderMap(shipment, fitRoute) {
   const statusIndex = deliveryStatuses.indexOf(shipment.status);
   const routeProgress = statusIndex < 0 ? 0 : statusIndex / (deliveryStatuses.length - 1);
   const traveledRoute = routePrefix(route, routeProgress);
-  L.polyline(points, { color: "#fff", weight: 9, opacity: 0.9, lineCap: "round", lineJoin: "round" }).addTo(mapLayers);
-  L.polyline(points, { color: "#8799a6", weight: 4, opacity: 0.58, dashArray: "2 9", lineCap: "round", lineJoin: "round" }).addTo(mapLayers);
+  L.polyline(points, { color: "#dfeaf2", weight: 9, opacity: 0.9, lineCap: "round", lineJoin: "round" }).addTo(mapLayers);
+  L.polyline(points, { color: "#748ca0", weight: 4, opacity: 0.7, dashArray: "2 10", lineCap: "round", lineJoin: "round" }).addTo(mapLayers);
   if (traveledRoute.length > 1) {
-    L.polyline(traveledRoute, { color: "#16a085", weight: 5, opacity: 0.96, lineCap: "round", lineJoin: "round" }).addTo(mapLayers);
+    L.polyline(traveledRoute, { color: "#33805a", weight: 6, opacity: 0.96, lineCap: "round", lineJoin: "round" }).addTo(mapLayers);
   }
-  const originIcon = L.divIcon({ className: "map-point-icon", html: '<span class="route-origin-marker"></span>', iconSize: [24, 32], iconAnchor: [12, 29] });
+  const originIcon = L.divIcon({ className: "map-point-icon", html: '<span class="route-origin-marker"></span>', iconSize: [26, 32], iconAnchor: [12, 29] });
   const destinationIcon = L.divIcon({
     className: `map-point-icon${shipment.status === "Delivered" ? " is-delivered" : ""}`,
     html: '<span class="route-destination-marker"></span>',
-    iconSize: [24, 32],
+    iconSize: [26, 32],
     iconAnchor: [12, 29]
   });
-  L.marker(points[0], { icon: originIcon }).bindTooltip(route[0].name || shipment.origin).addTo(mapLayers);
+  L.marker(points[0], { icon: originIcon }).bindTooltip(route[0].name || shipment.origin, { className: "route-tooltip route-tooltip-origin", direction: "top", offset: [0, -10] }).addTo(mapLayers);
   L.marker(points[points.length - 1], { icon: destinationIcon })
-    .bindTooltip(shipment.status === "Delivered" ? "Delivered" : route.at(-1).name || shipment.destination)
+    .bindTooltip(shipment.status === "Delivered" ? "Delivered" : route.at(-1).name || shipment.destination, { className: "route-tooltip route-tooltip-destination", direction: "top", offset: [0, -10] })
     .addTo(mapLayers);
   const fallbackPosition = positionOnRoute(route, routeProgress);
   const gpsPosition = shipment.currentLocation &&
@@ -296,6 +292,7 @@ function renderMap(shipment, fitRoute) {
   const courierPosition = shipment.status === "Delivered"
     ? points.at(-1)
     : gpsPosition || fallbackPosition;
+  mapRouteBounds = L.latLngBounds(points);
   const markerState = shipment.status === "Delivered" ? "is-delivered" : gpsPosition ? "is-live" : "is-estimated";
   const courierIcon = L.divIcon({
     className: `courier-map-icon ${markerState}`,
@@ -314,7 +311,7 @@ function renderMap(shipment, fitRoute) {
       .addTo(mapLayers);
   }
   if (fitRoute) {
-    if (gpsPosition && distanceToRoute(gpsPosition, points) > 50_000) {
+    if (shipment.status !== "Delivered" && gpsPosition && distanceToRoute(gpsPosition, points) > 50_000) {
       map.setView(gpsPosition, 12);
     } else {
       const visiblePoints = gpsPosition && shipment.status !== "Delivered" ? [...points, gpsPosition] : points;
@@ -512,6 +509,9 @@ document.querySelector("#zoom-in").addEventListener("click", () => {
 });
 document.querySelector("#zoom-out").addEventListener("click", () => {
   if (map) map.zoomOut();
+});
+document.querySelector("#zoom-to-route").addEventListener("click", () => {
+  if (map && mapRouteBounds) map.fitBounds(mapRouteBounds, { padding: [40, 40], maxZoom: 14 });
 });
 
 const menuToggle = document.querySelector(".menu-toggle");
