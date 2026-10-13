@@ -77,6 +77,12 @@ function formatTime(timestamp) {
     date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
+function recipientInitials(name) {
+  return name.trim().split(/\s+/).filter(Boolean).slice(0, 2)
+    .map((part) => Array.from(part)[0].toLocaleUpperCase())
+    .join("") || "?";
+}
+
 function updateTimeline(events, status) {
   timeline.replaceChildren();
   for (const [index, event] of events.entries()) {
@@ -342,6 +348,7 @@ function renderShipment(shipment) {
   const isNewShipment = displayedTrackingNumber !== shipment.trackingNumber;
   displayedTrackingNumber = shipment.trackingNumber;
   document.querySelector("#shipment-recipient").textContent = shipment.recipient;
+  document.querySelector("#recipient-avatar").textContent = recipientInitials(shipment.recipient);
   document.querySelector("#shipment-number").textContent = shipment.trackingNumber;
   document.querySelector("#shipment-origin").textContent = shipment.origin;
   document.querySelector("#shipment-destination").textContent = shipment.destination;
