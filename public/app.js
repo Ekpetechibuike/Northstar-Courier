@@ -47,14 +47,18 @@ function addMapTileLayer() {
       return;
     }
     mapEmptyState.textContent = mapTilesUnavailableMessage;
-    mapEmptyState.hidden = !renderStaticFallback(lastRenderedShipment);
+    mapEmptyState.hidden = false;
+    // Attempt a client-side static fallback when tile servers are unreachable
+    try { renderStaticFallback(lastRenderedShipment); } catch (e) { /* ignore */ }
   });
   tileLayer.on("tileload", () => {
     if (tileLayer !== sourceLayer) return;
     tileLoadErrors = 0;
     if (mapEmptyState.textContent === mapTilesUnavailableMessage) mapEmptyState.hidden = true;
-    const fallback = document.querySelector("#live-map .static-map-fallback");
-    if (fallback) fallback.remove();
+    try {
+      const fallback = document.querySelector('#live-map .static-map-fallback');
+      if (fallback) fallback.remove();
+    } catch (e) { }
   });
 }
 
@@ -168,71 +172,72 @@ function distanceToRoute(point, route) {
 }
 
 function renderStaticFallback(shipment) {
-  const container = document.querySelector("#live-map");
-  if (!container) return false;
-  const route = Array.isArray(shipment?.route)
-    ? shipment.route.filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng))
-    : [];
-  const gps = shipment?.currentLocation &&
-    Number.isFinite(shipment.currentLocation.latitude) &&
-    Number.isFinite(shipment.currentLocation.longitude)
-    ? { lat: shipment.currentLocation.latitude, lng: shipment.currentLocation.longitude }
-    : null;
-  const routeCoordinates = route.map((point) => ({ lat: point.lat, lng: point.lng }));
-  const points = [...routeCoordinates, ...(gps ? [gps] : [])];
-  if (!points.length) return false;
+  try {
+    const container = document.querySelector('#live-map');
+    if (!container) return;
+    const route = Array.isArray(shipment?.route) ? shipment.route.filter((p)=>Number.isFinite(p.lat)&&Number.isFinite(p.lng)) : [];
+    const gps = shipment?.currentLocation && Number.isFinite(shipment.currentLocation.latitude) && Number.isFinite(shipment.currentLocation.longitude)
+      ? { lat: shipment.currentLocation.latitude, lng: shipment.currentLocation.longitude }
+      : null;
+    const points = route.length ? route.map(p => ({ lat: p.lat, lng: p.lng })) : (gps ? [gps] : []);
+    if (points.length === 0) return;
+    let minLat = Math.min(...points.map(p=>p.lat));
+    let maxLat = Math.max(...points.map(p=>p.lat));
+    let minLng = Math.min(...points.map(p=>p.lng));
+    let maxLng = Math.max(...points.map(p=>p.lng));
+    // Add padding
+    const latPad = (maxLat - minLat) * 0.1 || 0.01;
+    const lngPad = (maxLng - minLng) * 0.1 || 0.01;
+    minLat -= latPad; maxLat += latPad; minLng -= lngPad; maxLng += lngPad;
+    const width = 1000; const height = 600;
+    function project(pt) {
+      const x = ((pt.lng - minLng) / (maxLng - minLng || 1)) * width;
+      const y = ((maxLat - pt.lat) / (maxLat - minLat || 1)) * height;
+      return { x, y };
+    }
+    const routePoints = route.map(p => project({ lat: p.lat, lng: p.lng }));
+    const polyPoints = routePoints.map(p => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' ');
+    const courierPoint = gps ? project(gps) : null;
+    const origin = routePoints[0];
+    const dest = routePoints[routePoints.length - 1];
+    const svgParts = [];
+    svgParts.push(`<svg xmlns='http://www.w3.org/2000/svg' width='${width}' height='${height}' viewBox='0 0 ${width} ${height}'>`);
+    svgParts.push(`<rect width='100%' height='100%' fill='#e6eef2'/>`);
+    if (polyPoints) svgParts.push(`<polyline points='${polyPoints}' fill='none' stroke='#8799a6' stroke-width='12' stroke-linecap='round' stroke-linejoin='round' opacity='0.9'/>`);
+    if (polyPoints) svgParts.push(`<polyline points='${polyPoints}' fill='none' stroke='#16a085' stroke-width='6' stroke-linecap='round' stroke-linejoin='round' opacity='0.95'/>`);
+    if (origin) svgParts.push(`<circle cx='${origin.x}' cy='${origin.y}' r='8' fill='#ffffff' stroke='#16a085' stroke-width='3'/>`);
+    if (dest) svgParts.push(`<circle cx='${dest.x}' cy='${dest.y}' r='8' fill='#ffffff' stroke='#8799a6' stroke-width='3'/>`);
+    if (courierPoint) svgParts.push(`<circle cx='${courierPoint.x}' cy='${courierPoint.y}' r='10' fill='#16a085' opacity='0.95'/>`);
+    svgParts.push(`</svg>`);
+    const svg = svgParts.join('');
+    const dataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
 
-  let minLat = Math.min(...points.map((point) => point.lat));
-  let maxLat = Math.max(...points.map((point) => point.lat));
-  let minLng = Math.min(...points.map((point) => point.lng));
-  let maxLng = Math.max(...points.map((point) => point.lng));
-  const latPad = (maxLat - minLat) * 0.1 || 0.01;
-  const lngPad = (maxLng - minLng) * 0.1 || 0.01;
-  minLat -= latPad;
-  maxLat += latPad;
-  minLng -= lngPad;
-  maxLng += lngPad;
-  const width = 1000;
-  const height = 600;
-  const project = (point) => ({
-    x: ((point.lng - minLng) / (maxLng - minLng || 1)) * width,
-    y: ((maxLat - point.lat) / (maxLat - minLat || 1)) * height
-  });
-  const routePoints = routeCoordinates.map(project);
-  const polyPoints = routePoints.map((point) => `${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(" ");
-  const courierPoint = gps ? project(gps) : null;
-  const origin = routePoints[0];
-  const dest = routePoints.at(-1);
-  const svg = [
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
-    `<rect width="100%" height="100%" fill="#e7eef0"/>`,
-    `<path d="M0 120 1000 440M0 480 1000 170M180 0 640 600M850 0 300 600" stroke="#fff" stroke-width="24"/>`,
-    `<path d="M0 120 1000 440M0 480 1000 170M180 0 640 600M850 0 300 600" stroke="#d5e0e5" stroke-width="2"/>`,
-    ...(polyPoints ? [`<polyline points="${polyPoints}" fill="none" stroke="#fff" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>`] : []),
-    ...(polyPoints ? [`<polyline points="${polyPoints}" fill="none" stroke="#e96c3c" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>`] : []),
-    ...(origin ? [`<circle cx="${origin.x}" cy="${origin.y}" r="10" fill="#fff" stroke="#e96c3c" stroke-width="4"/>`] : []),
-    ...(dest ? [`<circle cx="${dest.x}" cy="${dest.y}" r="10" fill="#fff" stroke="#184a68" stroke-width="4"/>`] : []),
-    ...(courierPoint ? [`<circle cx="${courierPoint.x}" cy="${courierPoint.y}" r="11" fill="#184a68" stroke="#fff" stroke-width="4"/>`] : []),
-    "</svg>"
-  ].join("");
-  const existing = container.querySelector(".static-map-fallback");
-  if (existing) existing.remove();
+    // Ensure container can position absolute children
+    const prevPosition = container.style.position;
+    if (!prevPosition || prevPosition === 'static') container.style.position = 'relative';
 
-  const image = document.createElement("img");
-  image.className = "static-map-fallback";
-  image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-  image.alt = "Route preview showing pickup, destination, and courier location";
-  Object.assign(image.style, {
-    position: "absolute",
-    inset: "0",
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
-    pointerEvents: "none",
-    zIndex: "400"
-  });
-  container.appendChild(image);
-  return true;
+    // Remove any existing fallback overlay
+    const existing = container.querySelector('.static-map-fallback');
+    if (existing) existing.remove();
+
+    const img = document.createElement('img');
+    img.className = 'static-map-fallback';
+    img.src = dataUrl;
+    img.alt = 'Fallback static map showing estimated route and courier position';
+    img.style.position = 'absolute';
+    img.style.left = '0';
+    img.style.top = '0';
+    img.style.width = '100%';
+    img.style.height = '100%';
+    img.style.objectFit = 'cover';
+    img.style.pointerEvents = 'none';
+    img.style.zIndex = '400';
+
+    container.appendChild(img);
+    if (mapEmptyState) { mapEmptyState.hidden = true; }
+  } catch (e) {
+    // swallow
+  }
 }
 
 function renderMap(shipment, fitRoute) {
@@ -245,8 +250,9 @@ function renderMap(shipment, fitRoute) {
     button.disabled = !hasMapRoute;
   });
   if (!map) {
-    mapEmptyState.textContent = "The interactive map is unavailable. Showing a route preview.";
-    mapEmptyState.hidden = renderStaticFallback(shipment);
+    mapEmptyState.textContent = "The live map is temporarily unavailable. Shipment tracking is still active.";
+    mapEmptyState.hidden = false;
+    renderStaticFallback(shipment);
     return;
   }
   mapLayers.clearLayers();
