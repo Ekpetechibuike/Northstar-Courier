@@ -1,14 +1,17 @@
 import { createServer } from "node:http";
 import { gzipSync } from "node:zlib";
-import { readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, extname, join, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomBytes, randomInt, randomUUID, scrypt as scryptCallback, scryptSync, timingSafeEqual } from "node:crypto";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const publicRoot = resolve(root, "public");
-const dataFile = resolve(root, "data", "shipments.json");
-const supportInboxFile = resolve(root, "data", "support-inbox.json");
+// Where data is kept. DATABASE_URL (Postgres) wins; otherwise JSON files in DATA_DIR.
+// On Render, set DATA_DIR to your persistent disk mount path (for example /var/data).
+const dataDir = process.env.DATA_DIR ? resolve(process.env.DATA_DIR) : resolve(root, "data");
+const dataFile = resolve(dataDir, "shipments.json");
+const supportInboxFile = resolve(dataDir, "support-inbox.json");
 const port = Number(process.env.PORT || 3000);
 const courierPortalPassword = process.env.COURIER_PORTAL_PASSWORD;
 const courierPasswordSalt = randomBytes(16);
@@ -118,19 +121,63 @@ function withDemoShipment(store) {
   return store;
 }
 
-async function loadStore() {
+let postgresPool = null;
+async function getPostgresPool() {
+  if (!process.env.DATABASE_URL) return null;
+  if (postgresPool) return postgresPool;
+  const { default: pg } = await import("pg");
+  const needsSsl = process.env.PGSSL === "true" || /\.render\.com/.test(process.env.DATABASE_URL);
+  const pool = new pg.Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: needsSsl ? { rejectUnauthorized: false } : undefined,
+    max: 5
+  });
+  await pool.query("CREATE TABLE IF NOT EXISTS app_documents (name TEXT PRIMARY KEY, body JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT now())");
+  postgresPool = pool;
+  return pool;
+}
+
+async function readJsonFile(file) {
   try {
-    return withDemoShipment(JSON.parse(await readFile(dataFile, "utf8")));
+    return JSON.parse(await readFile(file, "utf8"));
   } catch (error) {
     if (error.code !== "ENOENT") throw error;
-    return withDemoShipment({ shipments: [] });
+    return null;
   }
 }
 
+// Reads one saved document (shipments or support inbox). Returns null when nothing is saved yet.
+async function readDocument(name, file) {
+  const pool = await getPostgresPool();
+  if (pool) {
+    const result = await pool.query("SELECT body FROM app_documents WHERE name = $1", [name]);
+    if (result.rows[0]) return result.rows[0].body;
+    return readJsonFile(file); // first run after switching to Postgres: import any existing file
+  }
+  return readJsonFile(file);
+}
+
+async function writeDocument(name, file, document) {
+  const pool = await getPostgresPool();
+  if (pool) {
+    await pool.query(
+      "INSERT INTO app_documents (name, body, updated_at) VALUES ($1, $2::jsonb, now()) ON CONFLICT (name) DO UPDATE SET body = EXCLUDED.body, updated_at = now()",
+      [name, JSON.stringify(document)]
+    );
+    return;
+  }
+  await mkdir(dataDir, { recursive: true });
+  const temporaryFile = `${file}.${randomUUID()}.tmp`;
+  await writeFile(temporaryFile, `${JSON.stringify(document, null, 2)}\n`, "utf8");
+  await rename(temporaryFile, file);
+}
+
+async function loadStore() {
+  return withDemoShipment(await readDocument("shipments", dataFile));
+}
+
 function saveStore(store) {
-    const temporaryFile = `${dataFile}.${randomUUID()}.tmp`;
-  return writeFile(temporaryFile, `${JSON.stringify(store, null, 2)}\n`, "utf8")
-    .then(() => rename(temporaryFile, dataFile));
+  return writeDocument("shipments", dataFile, store);
 }
 
 function mutateStore(mutate) {
@@ -145,25 +192,17 @@ function mutateStore(mutate) {
 }
 
 async function loadSupportInbox() {
-  try {
-    const inbox = JSON.parse(await readFile(supportInboxFile, "utf8"));
-    if (!inbox || !Array.isArray(inbox.messages)) throw new Error("Support inbox data must contain a messages array.");
-    return inbox;
-  } catch (error) {
-    if (error.code !== "ENOENT") throw error;
-    return { messages: [] };
-  }
+  const inbox = await readDocument("support-inbox", supportInboxFile);
+  if (inbox === null) return { messages: [] };
+  if (!inbox || !Array.isArray(inbox.messages)) throw new Error("Support inbox data must contain a messages array.");
+  return inbox;
 }
 
 function mutateSupportInbox(mutate) {
   const operation = supportInboxQueue.then(async () => {
     const inbox = await loadSupportInbox();
     const { result, persist = true } = await mutate(inbox);
-    if (persist) {
-      const temporaryFile = `${supportInboxFile}.${randomUUID()}.tmp`;
-      await writeFile(temporaryFile, `${JSON.stringify(inbox, null, 2)}\n`, "utf8");
-      await rename(temporaryFile, supportInboxFile);
-    }
+    if (persist) await writeDocument("support-inbox", supportInboxFile, inbox);
     return result;
   });
   supportInboxQueue = operation.catch(() => {});
@@ -276,6 +315,34 @@ function compareCourierPassword(password) {
   });
 }
 
+// ---- Delivery pricing (EDIT THESE NUMBERS to match your real prices) ----
+const pricing = {
+  currency: "NGN",
+  baseBySize: { envelope: 1500, small: 2500, medium: 4000, large: 7000 },
+  includedKg: 1,
+  perExtraKg: 300,
+  serviceMultiplier: { standard: 1, express: 1.8 },
+  roundTo: 50
+};
+const packageSizes = Object.keys(pricing.baseBySize);
+const serviceNames = { standard: "Standard delivery", express: "Same-day express" };
+
+function estimatePrice(size, weightKg, service) {
+  if (!packageSizes.includes(size) || !pricing.serviceMultiplier[service]) return null;
+  if (!Number.isFinite(weightKg) || weightKg <= 0 || weightKg > 1000) return null;
+  const extraKg = Math.max(0, Math.ceil(weightKg - pricing.includedKg));
+  const raw = (pricing.baseBySize[size] + extraKg * pricing.perExtraKg) * pricing.serviceMultiplier[service];
+  return { amount: Math.round(raw / pricing.roundTo) * pricing.roundTo, currency: pricing.currency };
+}
+
+const phonePattern = /^[+0-9()\s-]{7,20}$/;
+const privateShipmentFields = ["senderPhone", "recipientPhone", "note"];
+function publicShipment(shipment) {
+  const copy = { ...shipment };
+  for (const field of privateShipmentFields) delete copy[field];
+  return copy;
+}
+
 function validateShipment(input) {
   const required = ["recipient", "origin", "destination"];
   if (!input || typeof input !== "object" || Array.isArray(input)) return "A JSON object is required.";
@@ -283,6 +350,26 @@ function validateShipment(input) {
     if (typeof input[field] !== "string" || input[field].trim().length < 2 || input[field].trim().length > 120) {
       return `${field} must be between 2 and 120 characters.`;
     }
+  }
+  if (typeof input.senderPhone !== "string" || !phonePattern.test(input.senderPhone.trim())) {
+    return "Enter a valid sender phone number.";
+  }
+  if (input.recipientPhone && (typeof input.recipientPhone !== "string" || !phonePattern.test(input.recipientPhone.trim()))) {
+    return "Enter a valid recipient phone number, or leave it empty.";
+  }
+  if (!packageSizes.includes(input.packageSize)) return "Choose a package size.";
+  if (!estimatePrice(input.packageSize, Number(input.weightKg), input.service)) {
+    return "Enter the package weight in kg (up to 1000) and choose a delivery speed.";
+  }
+  if (typeof input.pickupDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(input.pickupDate) ||
+      input.pickupDate < new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10)) {
+    return "Choose a pickup date that is today or later.";
+  }
+  if (typeof input.pickupTime !== "string" || !/^([01]\d|2[0-3]):[0-5]\d$/.test(input.pickupTime)) {
+    return "Choose a pickup time.";
+  }
+  if (input.note && (typeof input.note !== "string" || input.note.length > 500)) {
+    return "Notes must be 500 characters or fewer.";
   }
   return null;
 }
@@ -490,6 +577,11 @@ async function handleRequest(request, response) {
     return json(response, 400, { error: "Invalid URL path." });
   }
 
+  if (path === "/healthz") {
+    response.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" });
+    return response.end("ok");
+  }
+
   if (path.startsWith("/api/")) {
     response.setHeader("Cache-Control", "no-store");
     const bucket = request.method === "POST" && path === "/api/courier/login" ? "login" :
@@ -629,7 +721,13 @@ async function handleRequest(request, response) {
     if (!shipment) return json(response, 404, { error: "We couldn't find that tracking number." });
     if (!hasRoute(shipment)) shipment = await ensureShipmentRoute(shipment);
     if (!shipment) return json(response, 404, { error: "We couldn't find that tracking number." });
-    return json(response, 200, shipment);
+    return json(response, 200, publicShipment(shipment));
+  }
+
+  if (request.method === "GET" && path === "/api/quote") {
+    const quote = estimatePrice(url.searchParams.get("size"), Number(url.searchParams.get("weight")), url.searchParams.get("service"));
+    if (!quote) return json(response, 400, { error: "Choose a size, weight and delivery speed to see a price." });
+    return json(response, 200, quote);
   }
 
   if (request.method === "POST" && path === "/api/shipments") {
@@ -648,9 +746,17 @@ async function handleRequest(request, response) {
         destination,
         status: "Order placed",
         eta: "Estimated delivery will be confirmed soon",
-        service: "Standard delivery",
+        service: serviceNames[input.service],
         updatedAt: now,
         progress: 0,
+        senderPhone: input.senderPhone.trim(),
+        recipientPhone: typeof input.recipientPhone === "string" ? input.recipientPhone.trim() : "",
+        packageSize: input.packageSize,
+        weightKg: Number(input.weightKg),
+        pickupDate: input.pickupDate,
+        pickupTime: input.pickupTime,
+        note: typeof input.note === "string" ? input.note.trim() : "",
+        price: estimatePrice(input.packageSize, Number(input.weightKg), input.service),
         route,
         currentLocation: null,
         events: [{ status: "Order placed", location: input.origin.trim(), timestamp: now, completed: true }]
@@ -658,7 +764,7 @@ async function handleRequest(request, response) {
       store.shipments.push(createdShipment);
       return { result: createdShipment };
     });
-    return json(response, 201, shipment);
+    return json(response, 201, publicShipment(shipment));
   }
 
   if (request.method === "PATCH" && path.startsWith("/api/shipments/") && path.endsWith("/location")) {
@@ -786,6 +892,12 @@ server.listen(port, () => {
     console.warn("Courier portal sign-in is disabled until COURIER_PORTAL_PASSWORD is set to a strong password.");
   }
   console.log(`Northstar Courier is running at http://localhost:${port}`);
+  // Optional: set KEEP_AWAKE=true on Render's free plan to reduce sleeping (pings the public address every 10 minutes).
+  if (process.env.KEEP_AWAKE === "true" && process.env.RENDER_EXTERNAL_URL) {
+    setInterval(() => {
+      fetch(`${process.env.RENDER_EXTERNAL_URL}/healthz`, { signal: AbortSignal.timeout(10_000) }).catch(() => {});
+    }, 10 * 60 * 1000).unref();
+  }
 });
 
 server.on("error", (error) => {
