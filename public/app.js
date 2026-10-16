@@ -17,7 +17,7 @@ let trackingRequestId = 0;
 let mapResizeFrame = 0;
 let lastRenderedShipment = null;
 
-const demoTrackingNumber = "ST-8492-0317";
+const resultsSection = document.getElementById("results");
 const deliveryStatuses = ["Order placed", "Picked up", "In transit", "Out for delivery", "Delivered"];
 const mapTileSources = [
   {
@@ -411,6 +411,11 @@ async function trackShipment(trackingNumber, { silent = false } = {}) {
     if (!response.ok) throw new Error(payload.error || "Tracking information could not be loaded.");
     if (requestId !== trackingRequestId) return;
     renderShipment(payload);
+    if (resultsSection.hidden) {
+      resultsSection.hidden = false;
+      if (map) requestAnimationFrame(() => map.invalidateSize({ pan: false }));
+      if (!silent) resultsSection.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
     trackingInput.value = normalized;
     const shareUrl = new URL(window.location.href);
     shareUrl.searchParams.set("tracking", normalized);
@@ -566,9 +571,13 @@ async function refreshShipment() {
 setInterval(refreshShipment, 15_000);
 
 const requestedTrackingNumber = new URLSearchParams(window.location.search).get("tracking");
-const initialTrackingNumber = requestedTrackingNumber || demoTrackingNumber;
-trackingInput.value = initialTrackingNumber;
-trackShipment(initialTrackingNumber);
+// The results section stays hidden until a real tracking number is looked up.
+if (requestedTrackingNumber) {
+  trackingInput.value = requestedTrackingNumber;
+  trackShipment(requestedTrackingNumber);
+} else {
+  resultsSection.hidden = true;
+}
 
 // Debug overlay: visit the tracking page with ?debug=true on your phone to show diagnostics and copy them to clipboard
 if (new URLSearchParams(window.location.search).get("debug") === "true") {
