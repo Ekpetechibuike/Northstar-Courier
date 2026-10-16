@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { gzipSync } from "node:zlib";
 import { readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, extname, join, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -30,7 +31,9 @@ const mimeTypes = {
   ".js": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
   ".png": "image/png",
-  ".svg": "image/svg+xml"
+  ".svg": "image/svg+xml",
+  ".txt": "text/plain; charset=utf-8",
+  ".xml": "application/xml; charset=utf-8"
 };
 
 async function loadStore() {
@@ -364,6 +367,10 @@ async function handleRequest(request, response) {
   response.setHeader("X-Frame-Options", "DENY");
   response.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   response.setHeader("Permissions-Policy", "geolocation=(self), camera=(), microphone=()");
+  response.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://*.tile.openstreetmap.org; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
+  if (process.env.NODE_ENV === "production") {
+    response.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  }
 
   const url = new URL(request.url, `http://${request.headers.host || "localhost"}`);
   let path;
@@ -623,11 +630,22 @@ async function handleRequest(request, response) {
     return json(response, 403, { error: "Access denied." });
   }
   try {
-    const file = await readFile(filePath);
-    if ([".html", ".js", ".css"].includes(extname(filePath))) {
+    let file = await readFile(filePath);
+    const extension = extname(filePath);
+    if ([".html", ".js", ".css"].includes(extension)) {
       response.setHeader("Cache-Control", "no-cache");
+    } else if ([".png", ".svg"].includes(extension)) {
+      response.setHeader("Cache-Control", "public, max-age=604800");
     }
-    response.writeHead(200, { "Content-Type": mimeTypes[extname(filePath)] || "application/octet-stream" });
+    const headers = { "Content-Type": mimeTypes[extension] || "application/octet-stream" };
+    const compressible = [".html", ".js", ".css", ".svg", ".json", ".txt", ".xml"].includes(extension);
+    if (compressible && file.length > 1024 && /\bgzip\b/.test(request.headers["accept-encoding"] || "")) {
+      file = gzipSync(file);
+      headers["Content-Encoding"] = "gzip";
+    }
+    headers["Vary"] = "Accept-Encoding";
+    headers["Content-Length"] = file.length;
+    response.writeHead(200, headers);
     response.end(request.method === "HEAD" ? undefined : file);
   } catch (error) {
     if (error.code === "ENOENT" || error.code === "EISDIR") return json(response, 404, { error: "Page not found." });
