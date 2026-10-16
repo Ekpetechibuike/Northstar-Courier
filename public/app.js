@@ -17,7 +17,18 @@ let trackingRequestId = 0;
 let mapResizeFrame = 0;
 let lastRenderedShipment = null;
 
-const resultsSection = document.getElementById("results");
+const demoTrackingNumber = "ST-8492-0317";
+const savedShipmentKey = "northstar:myShipment";
+
+function readSavedShipment() {
+  try { return window.localStorage.getItem(savedShipmentKey) || ""; } catch { return ""; }
+}
+function writeSavedShipment(trackingNumber) {
+  try { window.localStorage.setItem(savedShipmentKey, trackingNumber); } catch { /* storage unavailable */ }
+}
+function clearSavedShipment() {
+  try { window.localStorage.removeItem(savedShipmentKey); } catch { /* storage unavailable */ }
+}
 const deliveryStatuses = ["Order placed", "Picked up", "In transit", "Out for delivery", "Delivered"];
 const mapTileSources = [
   {
@@ -411,11 +422,6 @@ async function trackShipment(trackingNumber, { silent = false } = {}) {
     if (!response.ok) throw new Error(payload.error || "Tracking information could not be loaded.");
     if (requestId !== trackingRequestId) return;
     renderShipment(payload);
-    if (resultsSection.hidden) {
-      resultsSection.hidden = false;
-      if (map) requestAnimationFrame(() => map.invalidateSize({ pan: false }));
-      if (!silent) resultsSection.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
     trackingInput.value = normalized;
     const shareUrl = new URL(window.location.href);
     shareUrl.searchParams.set("tracking", normalized);
@@ -480,6 +486,7 @@ bookingForm.addEventListener("submit", async (event) => {
     if (!response.ok) throw new Error(payload.error || "Your shipment could not be created.");
     bookingMessage.textContent = `Shipment created. Your tracking number is ${payload.trackingNumber}.`;
     bookingForm.reset();
+    writeSavedShipment(payload.trackingNumber);
     trackingInput.value = payload.trackingNumber;
     await trackShipment(payload.trackingNumber);
     document.querySelector("#tracking").scrollIntoView({ behavior: "smooth" });
@@ -571,13 +578,28 @@ async function refreshShipment() {
 setInterval(refreshShipment, 15_000);
 
 const requestedTrackingNumber = new URLSearchParams(window.location.search).get("tracking");
-// The results section stays hidden until a real tracking number is looked up.
-if (requestedTrackingNumber) {
-  trackingInput.value = requestedTrackingNumber;
-  trackShipment(requestedTrackingNumber);
-} else {
-  resultsSection.hidden = true;
+// Which shipment to show on load: a shared ?tracking= link first, then the shipment this
+// visitor created in this browser, then the sample shipment for everyone else.
+async function showInitialShipment() {
+  if (requestedTrackingNumber) {
+    trackingInput.value = requestedTrackingNumber;
+    return trackShipment(requestedTrackingNumber);
+  }
+  const savedTrackingNumber = readSavedShipment();
+  if (savedTrackingNumber) {
+    try {
+      const check = await fetch(`/api/shipments/${encodeURIComponent(savedTrackingNumber)}`);
+      if (check.ok) {
+        trackingInput.value = savedTrackingNumber;
+        return trackShipment(savedTrackingNumber);
+      }
+      if (check.status === 404) clearSavedShipment();
+    } catch { /* offline or server busy: fall back to the sample */ }
+  }
+  trackingInput.value = demoTrackingNumber;
+  return trackShipment(demoTrackingNumber);
 }
+showInitialShipment();
 
 // Debug overlay: visit the tracking page with ?debug=true on your phone to show diagnostics and copy them to clipboard
 if (new URLSearchParams(window.location.search).get("debug") === "true") {
