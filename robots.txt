@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /courier.html
+Disallow: /courier-login.html
+Sitemap: https://northstar-courier.onrender.com/sitemap.xml
