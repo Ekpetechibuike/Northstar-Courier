@@ -252,58 +252,86 @@ function hasRoute(shipment) {
     shipment.route.every((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng));
 }
 
+const geocodingUserAgent = process.env.GEOCODER_USER_AGENT || "NorthstarCourier/1.0 (https://northstar-courier.onrender.com)";
+const geocodingCache = new Map();
+
+function validCoordinates(latitude, longitude) {
+  return Number.isFinite(latitude) && latitude >= -90 && latitude <= 90 &&
+    Number.isFinite(longitude) && longitude >= -180 && longitude <= 180;
+}
+
+// Each provider returns { lat, lng } or null (address not found). It throws if the service itself fails.
+const geocodingProviders = [
+  {
+    name: "Nominatim",
+    async lookup(address) {
+      const url = new URL("https://nominatim.openstreetmap.org/search");
+      url.searchParams.set("format", "jsonv2");
+      url.searchParams.set("limit", "1");
+      url.searchParams.set("q", address);
+      const response = await fetch(url, {
+        headers: { "Accept": "application/json", "User-Agent": geocodingUserAgent, "Referer": "https://northstar-courier.onrender.com/" },
+        signal: AbortSignal.timeout(8_000)
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const results = await response.json();
+      if (!Array.isArray(results)) throw new Error("Invalid response");
+      if (results.length === 0) return null;
+      const lat = Number(results[0]?.lat);
+      const lng = Number(results[0]?.lon);
+      if (!validCoordinates(lat, lng)) throw new Error("Invalid coordinates");
+      return { lat, lng };
+    }
+  },
+  {
+    name: "Photon",
+    async lookup(address) {
+      const url = new URL("https://photon.komoot.io/api/");
+      url.searchParams.set("limit", "1");
+      url.searchParams.set("q", address);
+      const response = await fetch(url, {
+        headers: { "Accept": "application/json", "User-Agent": geocodingUserAgent },
+        signal: AbortSignal.timeout(8_000)
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const body = await response.json();
+      if (!body || !Array.isArray(body.features)) throw new Error("Invalid response");
+      if (body.features.length === 0) return null;
+      const [lng, lat] = body.features[0]?.geometry?.coordinates || [];
+      if (!validCoordinates(Number(lat), Number(lng))) throw new Error("Invalid coordinates");
+      return { lat: Number(lat), lng: Number(lng) };
+    }
+  }
+];
+
 function geocodeAddress(address, label) {
+  const cacheKey = address.trim().toLowerCase().replace(/\s+/g, " ");
+  const cached = geocodingCache.get(cacheKey);
+  if (cached) return Promise.resolve({ name: address, lat: cached.lat, lng: cached.lng });
+
   const operation = geocodingQueue.then(async () => {
     const waitMs = geocodingRequestIntervalMs - (Date.now() - lastGeocodingRequestAt);
     if (waitMs > 0) await new Promise((resolveWait) => setTimeout(resolveWait, waitMs));
     lastGeocodingRequestAt = Date.now();
 
-    const url = new URL("https://nominatim.openstreetmap.org/search");
-    url.searchParams.set("format", "jsonv2");
-    url.searchParams.set("limit", "1");
-    url.searchParams.set("q", address);
-    let response;
-    try {
-      response = await fetch(url, {
-        headers: { "Accept": "application/json", "User-Agent": "NorthstarCourier/1.0" },
-        signal: AbortSignal.timeout(10_000)
-      });
-    } catch (error) {
-      throw Object.assign(new Error("OpenStreetMap location lookup is unavailable. Please try again shortly."), {
-        status: 503,
-        cause: error
-      });
+    let anyProviderAnswered = false;
+    for (const provider of geocodingProviders) {
+      try {
+        const found = await provider.lookup(address);
+        anyProviderAnswered = true;
+        if (found) {
+          if (geocodingCache.size > 500) geocodingCache.delete(geocodingCache.keys().next().value);
+          geocodingCache.set(cacheKey, found);
+          return { name: address, lat: found.lat, lng: found.lng };
+        }
+      } catch (error) {
+        console.error(`Geocoding with ${provider.name} failed for the ${label} location:`, error.message);
+      }
     }
-    if (!response.ok) {
-      throw Object.assign(new Error("OpenStreetMap location lookup is unavailable. Please try again shortly."), { status: 503 });
-    }
-
-    let results;
-    try {
-      results = await response.json();
-    } catch (error) {
-      throw Object.assign(new Error("OpenStreetMap returned an invalid location response. Please try again."), {
-        status: 503,
-        cause: error
-      });
-    }
-    if (!Array.isArray(results)) {
-      throw Object.assign(new Error("OpenStreetMap returned an invalid location response. Please try again."), { status: 503 });
-    }
-    if (results.length === 0) {
+    if (anyProviderAnswered) {
       throw Object.assign(new Error(`We couldn't find the ${label} location on the map. Try adding a city, region, or country.`), { status: 422 });
     }
-    if (!results[0] || typeof results[0] !== "object") {
-      throw Object.assign(new Error("OpenStreetMap returned invalid coordinates. Please try again."), { status: 503 });
-    }
-
-    const latitude = Number(results[0].lat);
-    const longitude = Number(results[0].lon);
-    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 ||
-        !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
-      throw Object.assign(new Error("OpenStreetMap returned invalid coordinates. Please try again."), { status: 503 });
-    }
-    return { name: address, lat: latitude, lng: longitude };
+    throw Object.assign(new Error("OpenStreetMap location lookup is unavailable. Please try again shortly."), { status: 503 });
   });
   geocodingQueue = operation.catch(() => {});
   return operation;
