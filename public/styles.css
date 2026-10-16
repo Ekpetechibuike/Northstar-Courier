@@ -1282,3 +1282,59 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .site-footer { grid-template-columns: 1fr; }
   .info-section { padding-top: 40px; padding-bottom: 40px; }
 }
+
+
+/* ---------- Booking form extras ---------- */
+.booking-form select, .booking-form textarea { width: 100%; min-width: 0; padding: 0 11px; border: 1px solid #e5e9e5; border-radius: 6px; outline: none; color: var(--ink); font: inherit; font-size: 14px; background: #fff; }
+.booking-form select { height: 40px; }
+.booking-form textarea { padding: 10px 11px; resize: vertical; }
+.booking-form select:focus, .booking-form textarea:focus { border-color: #5b9c75; box-shadow: 0 0 0 3px #4a9b6d17; }
+.booking-form .booking-route-fields + .booking-route-fields { margin-top: 2px; }
+.booking-form label .support-optional { font-weight: 500; color: #5f6d66; }
+.booking-form .booking-estimate { min-height: 20px; margin: 4px 0 0; color: #194c35; font-size: 14px; font-weight: 600; }
+
+/* ---------- Hero illustration ---------- */
+.hero::before { content: ""; position: absolute; inset: 0; z-index: 0; background: url("hero.svg") right bottom / auto 100% no-repeat; opacity: .4; pointer-events: none; }
+
+@media (max-width: 800px) { .hero::before { opacity: .15; } }
+
+/* ---------- Floating call / WhatsApp buttons ---------- */
+.contact-fab { position: fixed; z-index: 40; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+.contact-fab a { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 50px; min-width: 50px; padding: 0 16px; border-radius: 999px; color: #fff; font-weight: 700; font-size: 15px; text-decoration: none; box-shadow: 0 8px 22px #0003; }
+.contact-fab svg { width: 22px; height: 22px; flex: none; }
+.contact-fab-chat { background: #1fa855; }
+.contact-fab-call { background: #101f2d; padding: 0; width: 50px; }
+.contact-fab a:hover { filter: brightness(1.08); }
+.contact-fab a:focus-visible { outline: 3px solid #ee7847; outline-offset: 2px; }
+@media (min-width: 900px) { .contact-fab-call { display: none; } }
+
+/* ---------- Dark mode (follows the visitor's device setting) ---------- */
+@media (prefers-color-scheme: dark) {
+  :root { color-scheme: dark; --ink: #e6edf3; --muted: #9aa9b6; --line: #263647; --paper: #15212d; --green: #6cc795; --green-dark: #55b07f; --green-soft: #17332a; }
+  body { background: #0b141c; color: var(--ink); }
+  .topbar, .nav-links, .menu-toggle, .footer, .promise-strip, .info-card, .faq-list details, .tracking-form,
+  .booking-form, .support-form, .shipment-details, .route-summary, .share-link-button, .map-legend > span, .map-live, .map-zoom,
+  .eta-icon, .eta-today, .package-icon, .route-plane, .timeline-node, .tracking-card-icon, .support-privacy-note {
+    background-color: #15212d; border-color: #263647; color: var(--ink);
+  }
+  .tracking-input-wrap { background: #0f1923; border-color: #2b3d4f; }
+  .booking-form input, .booking-form select, .booking-form textarea, .support-form select, .support-form textarea, .support-form input,
+  .tracking-input-wrap input { background: #0f1923; border-color: #2b3d4f; color: var(--ink); }
+  .booking-form input::placeholder, .booking-form textarea::placeholder, .tracking-input-wrap input::placeholder { color: #6f8294; }
+  .booking-form label, .support-form label, .tracking-form label { color: #a9b8c4; }
+  .info-heading p, .info-card p, .faq-list details p, .hero-description, .booking-copy p, .footer, .footer-col, .footer-col a { color: #a9b8c4; }
+  .footer-col strong, .footer-brand, .info-card h3, .info-heading h2 { color: #e6edf3; }
+  .footer-bottom, .footer { border-color: #263647; }
+  .step-number { background: #263647; }
+  .info-icon { background: #17332a; color: #6cc795; }
+  .status-pill { background: #1b2a38; color: #cfe0ec; }
+  body :is(h2, h3, strong) { color: #e6edf3 !important; }
+  body .hero h1 { color: #fff !important; }
+  .booking-section { background: #101c27 !important; border-color: #263647 !important; box-shadow: none !important; }
+  .booking-form select { font-size: 14px !important; }
+  .booking-copy h2 .heading-period { color: #ee7847 !important; }
+  .support-privacy-note, .form-note, .route-label, .tracking-number-label, .support-optional, .booking-form label .support-optional { color: #9aa9b6 !important; }
+  .booking-form .booking-estimate { color: #6cc795 !important; }
+  .nav-links a { color: #cfdae3; }
+  .nav-links a.nav-cta { color: #fff; }
+}
