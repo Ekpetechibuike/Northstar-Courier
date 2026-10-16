@@ -11,7 +11,9 @@
   <meta property="og:title" content="Northstar Courier: logistics that keep you moving">
   <meta property="og:description" content="Book deliveries, track every shipment on a live map, and reach our support team.">
   <meta property="og:url" content="https://northstar-courier.onrender.com/">
-  <meta name="twitter:card" content="summary">
+  <meta property="og:image" content="https://northstar-courier.onrender.com/og-image.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="theme-color" content="#101f2d">
   <title>Northstar — Logistics that keep you moving</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -20,6 +22,7 @@
   <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
   <link rel="stylesheet" href="styles.css">
   <script src="/vendor/leaflet/leaflet.js" defer></script>
+  <script src="site.js" defer></script>
   <script src="app.js" defer></script>
 </head>
   <body>
@@ -182,6 +185,23 @@
             <div><label for="booking-origin">Pickup location</label><input id="booking-origin" name="origin" type="text" maxlength="120" autocomplete="street-address" placeholder="City or address" required></div>
             <div><label for="booking-destination">Delivery location</label><input id="booking-destination" name="destination" type="text" maxlength="120" placeholder="City or address" required></div>
           </div>
+          <div class="booking-route-fields">
+            <div><label for="booking-sender-phone">Your phone number</label><input id="booking-sender-phone" name="senderPhone" type="tel" maxlength="20" autocomplete="tel" placeholder="e.g. 0801 234 5678" required></div>
+            <div><label for="booking-recipient-phone">Recipient phone <span class="support-optional">(optional)</span></label><input id="booking-recipient-phone" name="recipientPhone" type="tel" maxlength="20" autocomplete="off" placeholder="e.g. 0802 345 6789"></div>
+          </div>
+          <div class="booking-route-fields">
+            <div><label for="booking-size">Package size</label><select id="booking-size" name="packageSize" required><option value="envelope">Envelope or documents</option><option value="small" selected>Small box (shoebox)</option><option value="medium">Medium box</option><option value="large">Large box or bulky item</option></select></div>
+            <div><label for="booking-weight">Weight (kg)</label><input id="booking-weight" name="weightKg" type="number" min="0.1" max="1000" step="0.1" value="1" inputmode="decimal" required></div>
+          </div>
+          <div class="booking-route-fields">
+            <div><label for="booking-date">Pickup date</label><input id="booking-date" name="pickupDate" type="date" required></div>
+            <div><label for="booking-time">Pickup time</label><input id="booking-time" name="pickupTime" type="time" value="10:00" required></div>
+          </div>
+          <label for="booking-service">Delivery speed</label>
+          <select id="booking-service" name="service" required><option value="standard">Standard delivery</option><option value="express">Same-day express</option></select>
+          <label for="booking-note">Notes for the courier <span class="support-optional">(optional)</span></label>
+          <textarea id="booking-note" name="note" maxlength="500" rows="2" placeholder="Gate code, fragile items, landmarks…"></textarea>
+          <p class="booking-estimate" id="booking-estimate" role="status" aria-live="polite"></p>
           <p class="booking-geocoding-note">Pickup and delivery locations are sent to <a href="https://operations.osmfoundation.org/policies/nominatim/" target="_blank" rel="noreferrer">OpenStreetMap Nominatim</a> to show an estimated route. This is not live courier GPS.</p>
           <button type="submit" id="create-shipment-button">Create shipment <span aria-hidden="true">→</span></button>
           <p class="booking-message" id="booking-message" role="status" aria-live="polite"></p>
@@ -257,11 +277,12 @@
       </nav>
       <div class="footer-col">
         <strong>Contact</strong>
-        <!-- TODO: replace these placeholders with your real details -->
-        <a href="tel:+2340000000000">+234 000 000 0000</a>
-        <a href="mailto:hello@example.com">hello@example.com</a>
-        <span>Your street address, City</span>
-        <span>Mon to Sat, 8am to 6pm</span>
+        <!-- Edit your real details in public/site.js. Lines stay hidden until you do. -->
+        <a href="#" data-site="phone" hidden></a>
+        <a href="#" data-site="whatsapp" hidden>Chat on WhatsApp</a>
+        <a href="#" data-site="email" hidden></a>
+        <span data-site="address" hidden></span>
+        <span data-site="hours" hidden></span>
         <a href="#support">Contact support</a>
       </div>
       <div class="footer-bottom"><span>&copy; 2026 Northstar Courier</span><a href="/courier.html">Staff sign in</a></div>
