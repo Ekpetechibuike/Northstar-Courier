@@ -1336,4 +1336,4 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 /* ---------- Hero picture ---------- */
 .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
-.hero .hero-picture { display: block; width: 100%; height: auto; border-radius: 12px; }
+.hero .hero-picture { display: block; width: 100%; max-width: 520px; height: auto; margin: 4px 0 2px -22px; border-radius: 0; -webkit-mask-image: radial-gradient(ellipse 74% 80% at 50% 50%, #000 58%, transparent 100%); mask-image: radial-gradient(ellipse 74% 80% at 50% 50%, #000 58%, transparent 100%); }
