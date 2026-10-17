@@ -1293,11 +1293,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .booking-form label .support-optional { font-weight: 500; color: #5f6d66; }
 .booking-form .booking-estimate { min-height: 20px; margin: 4px 0 0; color: #194c35; font-size: 14px; font-weight: 600; }
 
-/* ---------- Hero illustration ---------- */
-.hero::before { content: ""; position: absolute; inset: 0; z-index: 0; background: url("hero.svg") right bottom / auto 100% no-repeat; opacity: .4; pointer-events: none; }
-
-@media (max-width: 800px) { .hero::before { opacity: .15; } }
-
 /* ---------- Floating call / WhatsApp buttons ---------- */
 .contact-fab { position: fixed; z-index: 40; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
 .contact-fab a { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 50px; min-width: 50px; padding: 0 16px; border-radius: 999px; color: #fff; font-weight: 700; font-size: 15px; text-decoration: none; box-shadow: 0 8px 22px #0003; }
@@ -1340,5 +1335,5 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 /* ---------- Banner picture ---------- */
-.banner-figure { margin: 0; padding: 8px max(5.5vw, calc((100vw - 1400px) / 2)) 0; }
+.banner-figure { margin: 0 0 8px; padding: 22px max(5.5vw, calc((100vw - 1400px) / 2)) 0; }
 .banner-figure img { display: block; width: 100%; max-width: 1100px; height: auto; margin: 0 auto; border-radius: 16px; box-shadow: 0 14px 40px #101f2d26; }
