@@ -36,6 +36,7 @@ const mimeTypes = {
   ".png": "image/png",
   ".svg": "image/svg+xml",
   ".txt": "text/plain; charset=utf-8",
+  ".webmanifest": "application/manifest+json; charset=utf-8",
   ".xml": "application/xml; charset=utf-8"
 };
 
@@ -187,7 +188,7 @@ function mutateStore(mutate) {
     if (persist) await saveStore(store);
     return result;
   });
-  mutationQueue = operation.catch(() => {});
+  mutationQueue = operation.catch(() => { });
   return operation;
 }
 
@@ -205,7 +206,7 @@ function mutateSupportInbox(mutate) {
     if (persist) await writeDocument("support-inbox", supportInboxFile, inbox);
     return result;
   });
-  supportInboxQueue = operation.catch(() => {});
+  supportInboxQueue = operation.catch(() => { });
   return operation;
 }
 
@@ -327,11 +328,13 @@ const pricing = {
 const packageSizes = Object.keys(pricing.baseBySize);
 const serviceNames = { standard: "Standard delivery", express: "Same-day express" };
 
-function estimatePrice(size, weightKg, service) {
+function estimatePrice(size, weightKg, service, options = {}) {
   if (!packageSizes.includes(size) || !pricing.serviceMultiplier[service]) return null;
   if (!Number.isFinite(weightKg) || weightKg <= 0 || weightKg > 1000) return null;
   const extraKg = Math.max(0, Math.ceil(weightKg - pricing.includedKg));
-  const raw = (pricing.baseBySize[size] + extraKg * pricing.perExtraKg) * pricing.serviceMultiplier[service];
+  let raw = (pricing.baseBySize[size] + extraKg * pricing.perExtraKg) * pricing.serviceMultiplier[service];
+  if (options.fragile) raw += 500;
+  if (options.insurance) raw += 1000;
   return { amount: Math.round(raw / pricing.roundTo) * pricing.roundTo, currency: pricing.currency };
 }
 
@@ -362,7 +365,7 @@ function validateShipment(input) {
     return "Enter the package weight in kg (up to 1000) and choose a delivery speed.";
   }
   if (typeof input.pickupDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(input.pickupDate) ||
-      input.pickupDate < new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10)) {
+    input.pickupDate < new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10)) {
     return "Choose a pickup date that is today or later.";
   }
   if (typeof input.pickupTime !== "string" || !/^([01]\d|2[0-3]):[0-5]\d$/.test(input.pickupTime)) {
@@ -410,7 +413,7 @@ function validateSupportMessage(input) {
     return "Choose a valid support topic.";
   }
   if (typeof input.trackingNumber !== "string" ||
-      (input.trackingNumber.trim() && !isValidTrackingNumber(normalizeTrackingNumber(input.trackingNumber)))) {
+    (input.trackingNumber.trim() && !isValidTrackingNumber(normalizeTrackingNumber(input.trackingNumber)))) {
     return "Enter a valid tracking number, or leave that field empty.";
   }
   return null;
@@ -502,7 +505,7 @@ function geocodeAddress(address, label) {
     }
     throw Object.assign(new Error("OpenStreetMap location lookup is unavailable. Please try again shortly."), { status: 503 });
   });
-  geocodingQueue = operation.catch(() => {});
+  geocodingQueue = operation.catch(() => { });
   return operation;
 }
 
@@ -586,7 +589,7 @@ async function handleRequest(request, response) {
     response.setHeader("Cache-Control", "no-store");
     const bucket = request.method === "POST" && path === "/api/courier/login" ? "login" :
       request.method === "POST" && path === "/api/support" ? "support" :
-      request.method === "POST" && path === "/api/shipments" ? "create" : "api";
+        request.method === "POST" && path === "/api/shipments" ? "create" : "api";
     const limit = bucket === "login" || bucket === "support" ? 5 : bucket === "create" ? 10 : 120;
     if (!enforceRateLimit(request, response, bucket, limit)) return;
   }
@@ -658,6 +661,32 @@ async function handleRequest(request, response) {
     return json(response, 405, { error: "Method not allowed." });
   }
 
+  if (path === "/api/courier/shipments" || path.startsWith("/api/courier/shipments/")) {
+    if (!isAdmin(request)) return json(response, 401, { error: "An active courier administrator session is required." });
+
+    if (path === "/api/courier/shipments" && request.method === "GET") {
+      const store = await loadStore();
+      const statusFilter = url.searchParams.get("status");
+      let shipments = [...store.shipments].sort((left, right) => Date.parse(right.updatedAt || 0) - Date.parse(left.updatedAt || 0));
+      if (statusFilter && statusFilter !== "all") {
+        shipments = shipments.filter((item) => item.status.toLowerCase() === statusFilter.toLowerCase());
+      }
+      return json(response, 200, { shipments });
+    }
+
+    const courierShipmentMatch = path.match(/^\/api\/courier\/shipments\/([A-Za-z0-9 -]+)$/);
+    if (courierShipmentMatch && request.method === "GET") {
+      const trackingNumber = normalizeTrackingNumber(courierShipmentMatch[1]);
+      const store = await loadStore();
+      const shipment = store.shipments.find((item) => normalizeTrackingNumber(item.trackingNumber) === trackingNumber);
+      if (!shipment) return json(response, 404, { error: "Shipment not found." });
+      return json(response, 200, shipment);
+    }
+
+    response.setHeader("Allow", "GET");
+    return json(response, 405, { error: "Method not allowed." });
+  }
+
   if (request.method === "GET" && path === "/api/courier/session") {
     const authenticated = hasCourierSession(request);
     return json(response, 200, { authenticated });
@@ -693,7 +722,7 @@ async function handleRequest(request, response) {
   }
 
   if (request.method === "GET" &&
-      ["/courier.html", "/courier.js", "/courier-login.html", "/courier-login.js"].includes(path)) {
+    ["/courier.html", "/courier.js", "/courier-login.html", "/courier-login.js"].includes(path)) {
     response.setHeader("Cache-Control", "no-store");
     if ((path === "/courier.html" || path === "/courier.js") && !hasCourierSession(request)) {
       const trackingNumber = url.searchParams.get("tracking");
@@ -725,7 +754,9 @@ async function handleRequest(request, response) {
   }
 
   if (request.method === "GET" && path === "/api/quote") {
-    const quote = estimatePrice(url.searchParams.get("size"), Number(url.searchParams.get("weight")), url.searchParams.get("service"));
+    const fragile = url.searchParams.get("fragile") === "true";
+    const insurance = url.searchParams.get("insurance") === "true";
+    const quote = estimatePrice(url.searchParams.get("size"), Number(url.searchParams.get("weight")), url.searchParams.get("service"), { fragile, insurance });
     if (!quote) return json(response, 400, { error: "Choose a size, weight and delivery speed to see a price." });
     return json(response, 200, quote);
   }
@@ -738,6 +769,9 @@ async function handleRequest(request, response) {
     const destination = input.destination.trim();
     const route = await geocodeRoute(origin, destination);
     const now = new Date().toISOString();
+    const fragile = Boolean(input.fragile === true || input.fragile === "true" || input.fragile === "on");
+    const insurance = Boolean(input.insurance === true || input.insurance === "true" || input.insurance === "on");
+    const paymentMethod = ["pay_on_delivery", "bank_transfer"].includes(input.paymentMethod) ? input.paymentMethod : "pay_on_delivery";
     const shipment = await mutateStore((store) => {
       const createdShipment = {
         trackingNumber: createTrackingNumber(store.shipments),
@@ -756,7 +790,10 @@ async function handleRequest(request, response) {
         pickupDate: input.pickupDate,
         pickupTime: input.pickupTime,
         note: typeof input.note === "string" ? input.note.trim() : "",
-        price: estimatePrice(input.packageSize, Number(input.weightKg), input.service),
+        paymentMethod,
+        fragile,
+        insurance,
+        price: estimatePrice(input.packageSize, Number(input.weightKg), input.service, { fragile, insurance }),
         route,
         currentLocation: null,
         events: [{ status: "Order placed", location: input.origin.trim(), timestamp: now, completed: true }]
@@ -774,7 +811,7 @@ async function handleRequest(request, response) {
     const validLatitude = Number.isFinite(input.latitude) && input.latitude >= -90 && input.latitude <= 90;
     const validLongitude = Number.isFinite(input.longitude) && input.longitude >= -180 && input.longitude <= 180;
     if (!validLatitude || !validLongitude || typeof input.location !== "string" ||
-        input.location.trim().length < 2 || input.location.trim().length > 120) {
+      input.location.trim().length < 2 || input.location.trim().length > 120) {
       return json(response, 400, { error: "Provide valid latitude, longitude, and location values." });
     }
     const result = await mutateStore((store) => {
@@ -800,7 +837,7 @@ async function handleRequest(request, response) {
     const input = await readBody(request);
     const allowedStatuses = ["Order placed", "Picked up", "In transit", "Out for delivery", "Delivered"];
     if (!allowedStatuses.includes(input.status) || typeof input.location !== "string" ||
-        input.location.trim().length < 2 || input.location.trim().length > 120) {
+      input.location.trim().length < 2 || input.location.trim().length > 120) {
       return json(response, 400, { error: "Provide a valid shipment status and location." });
     }
     const result = await mutateStore((store) => {
@@ -848,13 +885,13 @@ async function handleRequest(request, response) {
   try {
     let file = await readFile(filePath);
     const extension = extname(filePath);
-    if ([".html", ".js", ".css"].includes(extension)) {
+    if ([".html", ".js", ".css", ".webmanifest"].includes(extension)) {
       response.setHeader("Cache-Control", "no-cache");
     } else if ([".png", ".svg"].includes(extension)) {
       response.setHeader("Cache-Control", "public, max-age=604800");
     }
     const headers = { "Content-Type": mimeTypes[extension] || "application/octet-stream" };
-    const compressible = [".html", ".js", ".css", ".svg", ".json", ".txt", ".xml"].includes(extension);
+    const compressible = [".html", ".js", ".css", ".svg", ".json", ".txt", ".xml", ".webmanifest"].includes(extension);
     if (compressible && file.length > 1024 && /\bgzip\b/.test(request.headers["accept-encoding"] || "")) {
       file = gzipSync(file);
       headers["Content-Encoding"] = "gzip";
@@ -887,20 +924,30 @@ server.on("request", (_request, response) => {
   });
 });
 
-server.listen(port, () => {
-  if (!passwordMeetsStrengthRequirements(courierPortalPassword)) {
-    console.warn("Courier portal sign-in is disabled until COURIER_PORTAL_PASSWORD is set to a strong password.");
-  }
-  console.log(`Northstar Courier is running at http://localhost:${port}`);
-  // Optional: set KEEP_AWAKE=true on Render's free plan to reduce sleeping (pings the public address every 10 minutes).
-  if (process.env.KEEP_AWAKE === "true" && process.env.RENDER_EXTERNAL_URL) {
-    setInterval(() => {
-      fetch(`${process.env.RENDER_EXTERNAL_URL}/healthz`, { signal: AbortSignal.timeout(10_000) }).catch(() => {});
-    }, 10 * 60 * 1000).unref();
-  }
-});
+let currentPort = port;
+function startServer(p) {
+  server.listen(p, () => {
+    if (!passwordMeetsStrengthRequirements(courierPortalPassword)) {
+      console.warn("Courier portal sign-in is disabled until COURIER_PORTAL_PASSWORD is set to a strong password.");
+    }
+    console.log(`Northstar Courier is running at http://localhost:${p}`);
+    if (process.env.KEEP_AWAKE === "true" && process.env.RENDER_EXTERNAL_URL) {
+      setInterval(() => {
+        fetch(`${process.env.RENDER_EXTERNAL_URL}/healthz`, { signal: AbortSignal.timeout(10_000) }).catch(() => { });
+      }, 10 * 60 * 1000).unref();
+    }
+  });
+}
 
 server.on("error", (error) => {
+  if (error.code === "EADDRINUSE" && !process.env.PORT && currentPort < 3010) {
+    console.warn(`Port ${currentPort} is currently in use (e.g. by VS Code port forwarding or another service). Trying port ${currentPort + 1}...`);
+    currentPort += 1;
+    setTimeout(() => startServer(currentPort), 200);
+    return;
+  }
   console.error("Server failed to start:", error);
   process.exitCode = 1;
 });
+
+startServer(currentPort);
