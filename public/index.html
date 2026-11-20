@@ -1,4 +1,4 @@
-<!Doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -16,11 +16,24 @@
   <meta name="theme-color" content="#101f2d">
   <title>Northstar — Logistics that keep you moving</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="manifest" href="/manifest.webmanifest">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
   <link rel="stylesheet" href="styles.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "DeliveryService",
+    "name": "Northstar Courier",
+    "description": "Fast and dependable door-to-door courier delivery and live shipment tracking.",
+    "url": "https://northstar-courier.onrender.com/",
+    "logo": "https://northstar-courier.onrender.com/favicon.svg",
+    "serviceType": ["Same-day delivery", "Standard parcel delivery", "Business logistics"],
+    "areaServed": "Nigeria"
+  }
+  </script>
   <script src="/vendor/leaflet/leaflet.js" defer></script>
   <script src="site.js" defer></script>
   <script src="app.js" defer></script>
@@ -47,8 +60,7 @@
       <section class="hero" id="tracking">
         <div class="hero-copy hero-picture-wrap">
           <div class="eyebrow"><span class="eyebrow-dot"></span> LOGISTICS WITHOUT THE GUESSWORK</div>
-          <h1 class="visually-hidden">Every shipment. Right on track.</h1>
-          <img class="hero-picture" src="og-image.png" width="1200" height="630" decoding="async" alt="Northstar Courier: every shipment, right on track. Book deliveries and track every mile live.">
+          <h1 class="hero-title">Every shipment.<br><span class="hero-highlight">Right on track<span class="heading-period">.</span></span></h1>
           <p class="hero-description">From first mile to final delivery, move every shipment with confidence. Live visibility, dependable people, no surprises.</p>
           <div class="hero-proof">
             <div><strong>24/7</strong><span>shipment visibility</span></div>
@@ -67,6 +79,10 @@
               <input id="tracking-number" name="trackingNumber" type="text" placeholder="Enter your delivery number" value="ST-8492-0317" maxlength="64" autocomplete="off" spellcheck="false" required>
             </div>
             <button type="submit" id="track-button">Track package <span aria-hidden="true">→</span></button>
+          </div>
+          <div class="recent-tracking-wrap" id="recent-tracking-wrap" hidden>
+            <span class="recent-tracking-label">Recent:</span>
+            <div class="recent-tracking-list" id="recent-tracking-list"></div>
           </div>
           <p class="form-note"><span aria-hidden="true">⌁</span> Find it in your shipping confirmation.</p>
           <p class="form-error" id="form-error" role="alert" hidden></p>
@@ -116,6 +132,14 @@
                 <button type="button" class="share-link-button" id="share-tracking" disabled>
                   <svg aria-hidden="true" viewBox="0 0 20 20"><path d="M7.5 10.5 12 6m-2.2-.1.3-.3a2.5 2.5 0 0 1 3.5 3.5l-1.2 1.2a2.5 2.5 0 0 1-3.5 0m1.1 1.8-.3.3a2.5 2.5 0 0 1-3.5-3.5l1.2-1.2a2.5 2.5 0 0 1 3.5 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
                   Copy tracking link
+                </button>
+                <button type="button" class="share-link-button share-whatsapp-button" id="share-whatsapp" disabled>
+                  <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 3.5h14a2 2 0 0 1 2 2v9.5a2 2 0 0 1-2 2H10l-5 4v-4a2 2 0 0 1-2-2V5.500a2 2 0 0 1 2-2Z" fill="currentColor"/></svg>
+                  WhatsApp
+                </button>
+                <button type="button" class="share-link-button print-receipt-button" id="print-receipt" disabled>
+                  <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v7H6v-7Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  Print receipt
                 </button>
                 <span class="share-link-message" id="share-link-message" role="status" aria-live="polite"></span>
               </div>
@@ -200,12 +224,49 @@
           </div>
           <label for="booking-service">Delivery speed</label>
           <select id="booking-service" name="service" required><option value="standard">Standard delivery</option><option value="express">Same-day express</option></select>
+          <div class="booking-route-fields">
+            <div>
+              <label for="booking-payment">Payment method</label>
+              <select id="booking-payment" name="paymentMethod">
+                <option value="pay_on_delivery" selected>Pay on pickup / delivery (Cash or POS)</option>
+                <option value="bank_transfer">Prepaid (Bank transfer)</option>
+              </select>
+            </div>
+            <div class="booking-checkboxes-col">
+              <label class="booking-checkbox-label">
+                <input type="checkbox" id="booking-fragile" name="fragile">
+                <span>Fragile item protection (+₦500)</span>
+              </label>
+              <label class="booking-checkbox-label">
+                <input type="checkbox" id="booking-insurance" name="insurance">
+                <span>Delivery insurance protection (+₦1,000)</span>
+              </label>
+            </div>
+          </div>
           <label for="booking-note">Notes for the courier <span class="support-optional">(optional)</span></label>
           <textarea id="booking-note" name="note" maxlength="500" rows="2" placeholder="Gate code, fragile items, landmarks…"></textarea>
           <p class="booking-estimate" id="booking-estimate" role="status" aria-live="polite"></p>
           <p class="booking-geocoding-note">Pickup and delivery locations are sent to <a href="https://operations.osmfoundation.org/policies/nominatim/" target="_blank" rel="noreferrer">OpenStreetMap Nominatim</a> to show an estimated route. This is not live courier GPS.</p>
           <button type="submit" id="create-shipment-button">Create shipment <span aria-hidden="true">→</span></button>
           <p class="booking-message" id="booking-message" role="status" aria-live="polite"></p>
+          <div class="booking-success-card" id="booking-success-card" hidden role="region" aria-label="Booking Confirmation">
+            <div class="booking-success-header">
+              <span class="booking-success-badge">✓ Shipment Created</span>
+              <h3>Your shipment is booked!</h3>
+            </div>
+            <div class="booking-success-body">
+              <div class="booking-success-code">
+                <span>YOUR TRACKING NUMBER</span>
+                <strong id="created-tracking-number">ST-0000-0000</strong>
+              </div>
+              <p id="created-shipment-summary"></p>
+              <div class="booking-success-actions">
+                <button type="button" class="booking-action-btn" id="created-track-btn">Track shipment now <span aria-hidden="true">→</span></button>
+                <button type="button" class="booking-action-btn secondary" id="created-whatsapp-btn">Share via WhatsApp</button>
+                <button type="button" class="booking-action-btn secondary" id="created-copy-btn">Copy tracking number</button>
+              </div>
+            </div>
+          </div>
         </form>
       </section>
 
@@ -289,5 +350,6 @@
       </div>
       <div class="footer-bottom"><span>&copy; 2026 Northstar Courier</span><a href="/courier.html">Staff sign in</a></div>
     </footer>
+    <div id="toast-container" class="toast-container" aria-live="polite"></div>
   </body>
 </html>
