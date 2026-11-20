@@ -9,6 +9,13 @@ const inboxRefreshButton = document.querySelector("#courier-inbox-refresh");
 const inboxFilter = document.querySelector("#courier-inbox-filter");
 const inboxMessage = document.querySelector("#courier-inbox-message");
 const inboxList = document.querySelector("#courier-inbox-list");
+
+const shipmentsCount = document.querySelector("#courier-shipments-count");
+const shipmentsRefreshButton = document.querySelector("#courier-shipments-refresh");
+const shipmentsFilter = document.querySelector("#courier-shipments-filter");
+const shipmentsMessage = document.querySelector("#courier-shipments-message");
+const shipmentsList = document.querySelector("#courier-shipments-list");
+
 const shipmentPanel = document.querySelector("#courier-shipment-panel");
 const statusForm = document.querySelector("#courier-status-form");
 const statusSelect = document.querySelector("#courier-next-status");
@@ -25,8 +32,10 @@ const locationMessage = document.querySelector("#courier-location-message");
 
 let activeShipment = null;
 let supportMessages = [];
+let allShipments = [];
 
 function setMessage(element, message, isError = false) {
+  if (!element) return;
   element.textContent = message;
   element.classList.toggle("courier-message-error", isError);
 }
@@ -59,6 +68,88 @@ async function apiRequest(path, options = {}) {
     throw new Error(payload.error || "The shipment update could not be completed.");
   }
   return payload;
+}
+
+function renderShipmentsBoard() {
+  if (!shipmentsList) return;
+  const activeCount = allShipments.filter((s) => s.status !== "Delivered").length;
+  if (shipmentsCount) shipmentsCount.textContent = `${activeCount} active`;
+  shipmentsList.replaceChildren();
+
+  const filterVal = shipmentsFilter ? shipmentsFilter.value : "all";
+  const filtered = allShipments.filter((item) => {
+    if (filterVal === "all") return true;
+    if (filterVal === "active") return item.status !== "Delivered";
+    return item.status === filterVal;
+  });
+
+  if (filtered.length === 0) {
+    const emptyState = document.createElement("p");
+    emptyState.className = "courier-inbox-empty";
+    emptyState.textContent = filterVal === "all"
+      ? "No shipments registered in the database."
+      : `No shipments matching "${filterVal}".`;
+    shipmentsList.append(emptyState);
+    return;
+  }
+
+  for (const s of filtered) {
+    const card = document.createElement("article");
+    card.className = `courier-shipment-card${activeShipment?.trackingNumber === s.trackingNumber ? " is-selected" : ""}`;
+
+    const header = document.createElement("div");
+    header.className = "courier-shipment-card-header";
+
+    const titleGroup = document.createElement("div");
+    const title = document.createElement("h3");
+    title.textContent = s.trackingNumber;
+    const subtitle = document.createElement("p");
+    subtitle.textContent = `To: ${s.recipient} · ${s.destination}`;
+    titleGroup.append(title, subtitle);
+
+    const pill = document.createElement("span");
+    pill.className = `courier-status-pill status-${s.status.toLowerCase().replace(/\s+/g, "-")}`;
+    pill.textContent = s.status;
+    header.append(titleGroup, pill);
+
+    const body = document.createElement("div");
+    body.className = "courier-shipment-card-body";
+    const route = document.createElement("span");
+    route.textContent = `From ${s.origin}`;
+    const priceText = s.price ? ` · ₦${Number(s.price.amount).toLocaleString()}` : "";
+    const payment = document.createElement("span");
+    payment.textContent = `${s.service || "Standard"}${priceText}`;
+    body.append(route, payment);
+
+    const actions = document.createElement("div");
+    actions.className = "courier-shipment-card-actions";
+    const selectBtn = document.createElement("button");
+    selectBtn.type = "button";
+    selectBtn.className = "courier-select-shipment-btn";
+    selectBtn.textContent = activeShipment?.trackingNumber === s.trackingNumber ? "Selected ✓" : "Manage delivery →";
+    selectBtn.addEventListener("click", () => {
+      loadShipmentByNumber(s.trackingNumber);
+    });
+    actions.append(selectBtn);
+
+    card.append(header, body, actions);
+    shipmentsList.append(card);
+  }
+}
+
+async function refreshShipmentsBoard() {
+  if (!shipmentsRefreshButton) return;
+  shipmentsRefreshButton.disabled = true;
+  setMessage(shipmentsMessage, "");
+  try {
+    const payload = await apiRequest("/api/courier/shipments");
+    allShipments = payload.shipments || [];
+    renderShipmentsBoard();
+  } catch (error) {
+    setMessage(shipmentsMessage, error.message, true);
+  } finally {
+    shipmentsRefreshButton.disabled = false;
+  }
 }
 
 function renderSupportInbox() {
@@ -153,6 +244,52 @@ function renderShipment(shipment) {
   document.querySelector("#courier-detail-origin").textContent = shipment.origin;
   document.querySelector("#courier-detail-destination").textContent = shipment.destination;
 
+  // Extended staff details
+  const senderPhoneEl = document.querySelector("#courier-detail-sender-phone");
+  const recipientPhoneEl = document.querySelector("#courier-detail-recipient-phone");
+  const weightEl = document.querySelector("#courier-detail-weight");
+  const paymentEl = document.querySelector("#courier-detail-payment");
+  const notesBox = document.querySelector("#courier-detail-notes-box");
+  const notesEl = document.querySelector("#courier-detail-notes");
+
+  if (senderPhoneEl) {
+    if (shipment.senderPhone) {
+      senderPhoneEl.innerHTML = `<a href="tel:${shipment.senderPhone}">${shipment.senderPhone}</a>`;
+    } else {
+      senderPhoneEl.textContent = "Not specified";
+    }
+  }
+  if (recipientPhoneEl) {
+    if (shipment.recipientPhone) {
+      const cleanDigits = shipment.recipientPhone.replace(/[^\d+]/g, "").replace("+", "");
+      recipientPhoneEl.innerHTML = `<a href="tel:${shipment.recipientPhone}">${shipment.recipientPhone}</a> <a href="https://wa.me/${cleanDigits}" target="_blank" rel="noreferrer" class="courier-phone-wa">WhatsApp</a>`;
+    } else {
+      recipientPhoneEl.textContent = "Not specified";
+    }
+  }
+  if (weightEl) {
+    const sizeName = shipment.packageSize ? shipment.packageSize.charAt(0).toUpperCase() + shipment.packageSize.slice(1) : "Package";
+    const weightStr = shipment.weightKg ? ` · ${shipment.weightKg} kg` : "";
+    const badges = [];
+    if (shipment.fragile) badges.push("Fragile");
+    if (shipment.insurance) badges.push("Insured");
+    const badgeStr = badges.length ? ` (${badges.join(", ")})` : "";
+    weightEl.textContent = `${sizeName}${weightStr}${badgeStr}`;
+  }
+  if (paymentEl) {
+    const payMethod = shipment.paymentMethod === "bank_transfer" ? "Prepaid (Transfer)" : "Pay on Delivery";
+    const amountStr = shipment.price ? ` · ₦${Number(shipment.price.amount).toLocaleString()}` : "";
+    paymentEl.textContent = `${payMethod}${amountStr}`;
+  }
+  if (notesBox && notesEl) {
+    if (shipment.note && shipment.note.trim()) {
+      notesEl.textContent = shipment.note.trim();
+      notesBox.hidden = false;
+    } else {
+      notesBox.hidden = true;
+    }
+  }
+
   const currentIndex = deliveryStatuses.indexOf(shipment.status);
   const nextStatus = deliveryStatuses[currentIndex + 1];
   statusSelect.replaceChildren();
@@ -180,6 +317,8 @@ function renderShipment(shipment) {
   }
 
   shipmentPanel.hidden = false;
+  renderShipmentsBoard();
+
   setMessage(statusMessage, nextStatus
     ? `Next step: ${nextStatus}. Update it when the courier completes that scan.`
     : "This shipment has been delivered.");
@@ -188,18 +327,18 @@ function renderShipment(shipment) {
     : "No courier GPS has been sent for this shipment yet.");
 }
 
-lookupForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const trackingNumber = trackingNumberInput.value.trim().toUpperCase();
+async function loadShipmentByNumber(trackingNumber) {
+  trackingNumberInput.value = trackingNumber;
   setMessage(lookupMessage, "");
   setMessage(statusMessage, "");
   setMessage(locationMessage, "");
   lookupButton.disabled = true;
   lookupButton.textContent = "Loading shipment…";
   try {
-    const shipment = await apiRequest(`/api/shipments/${encodeURIComponent(trackingNumber)}`);
+    const shipment = await apiRequest(`/api/courier/shipments/${encodeURIComponent(trackingNumber)}`);
     renderShipment(shipment);
-    setMessage(lookupMessage, `Loaded ${shipment.trackingNumber}. Updates are protected by your portal session.`);
+    setMessage(lookupMessage, `Loaded ${shipment.trackingNumber}. Ready for status or GPS updates.`);
+    shipmentPanel.scrollIntoView({ behavior: "smooth" });
   } catch (error) {
     activeShipment = null;
     shipmentPanel.hidden = true;
@@ -208,7 +347,16 @@ lookupForm.addEventListener("submit", async (event) => {
     lookupButton.disabled = false;
     lookupButton.innerHTML = 'Load shipment <span aria-hidden="true">→</span>';
   }
+}
+
+lookupForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const trackingNumber = trackingNumberInput.value.trim().toUpperCase();
+  await loadShipmentByNumber(trackingNumber);
 });
+
+if (shipmentsRefreshButton) shipmentsRefreshButton.addEventListener("click", refreshShipmentsBoard);
+if (shipmentsFilter) shipmentsFilter.addEventListener("change", renderShipmentsBoard);
 
 inboxRefreshButton.addEventListener("click", refreshSupportInbox);
 inboxFilter.addEventListener("change", renderSupportInbox);
@@ -260,6 +408,7 @@ statusForm.addEventListener("submit", async (event) => {
       })
     });
     renderShipment(shipment);
+    await refreshShipmentsBoard();
     setMessage(statusMessage, `Shipment advanced to ${shipment.status}. The tracking page will refresh within 15 seconds.`);
   } catch (error) {
     setMessage(statusMessage, error.message, true);
@@ -282,6 +431,7 @@ locationForm.addEventListener("submit", async (event) => {
       })
     });
     renderShipment(shipment);
+    await refreshShipmentsBoard();
     setMessage(locationMessage, `Courier GPS updated at ${new Date(shipment.currentLocation.updatedAt).toLocaleTimeString()}.`);
   } catch (error) {
     setMessage(locationMessage, error.message, true);
@@ -323,9 +473,10 @@ useGpsButton.addEventListener("click", () => {
 
 const requestedTrackingNumber = new URLSearchParams(window.location.search).get("tracking");
 if (requestedTrackingNumber) {
-  trackingNumberInput.value = requestedTrackingNumber;
-  lookupForm.requestSubmit();
+  loadShipmentByNumber(requestedTrackingNumber);
 }
 
 refreshSupportInbox();
+refreshShipmentsBoard();
 setInterval(refreshSupportInbox, 60_000);
+setInterval(refreshShipmentsBoard, 30_000);
