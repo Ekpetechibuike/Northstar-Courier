@@ -3,6 +3,8 @@ const trackingInput = document.querySelector("#tracking-number");
 const errorMessage = document.querySelector("#form-error");
 const trackButton = document.querySelector("#track-button");
 const shareTrackingButton = document.querySelector("#share-tracking");
+const shareWhatsappButton = document.querySelector("#share-whatsapp");
+const printReceiptButton = document.querySelector("#print-receipt");
 const shareLinkMessage = document.querySelector("#share-link-message");
 const timeline = document.querySelector("#timeline-list");
 const mapEmptyState = document.querySelector("#map-empty-state");
@@ -19,6 +21,20 @@ let lastRenderedShipment = null;
 
 const demoTrackingNumber = "ST-8492-0317";
 const savedShipmentKey = "northstar:myShipment";
+const recentShipmentsKey = "northstar:recentShipments";
+
+function showToast(message, type = "info") {
+  const container = document.querySelector("#toast-container");
+  if (!container) return;
+  const toast = document.createElement("div");
+  toast.className = `toast toast-${type}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.classList.add("fade-out");
+    setTimeout(() => toast.remove(), 400);
+  }, 4500);
+}
 
 function readSavedShipment() {
   try { return window.localStorage.getItem(savedShipmentKey) || ""; } catch { return ""; }
@@ -28,6 +44,44 @@ function writeSavedShipment(trackingNumber) {
 }
 function clearSavedShipment() {
   try { window.localStorage.removeItem(savedShipmentKey); } catch { /* storage unavailable */ }
+}
+
+function readRecentShipments() {
+  try {
+    const raw = window.localStorage.getItem(recentShipmentsKey);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+function addRecentShipment(trackingNumber) {
+  try {
+    const list = readRecentShipments().filter((num) => num !== trackingNumber);
+    list.unshift(trackingNumber);
+    window.localStorage.setItem(recentShipmentsKey, JSON.stringify(list.slice(0, 5)));
+    renderRecentShipments();
+  } catch { /* storage unavailable */ }
+}
+function renderRecentShipments() {
+  const wrap = document.querySelector("#recent-tracking-wrap");
+  const listEl = document.querySelector("#recent-tracking-list");
+  if (!wrap || !listEl) return;
+  const list = readRecentShipments();
+  if (list.length === 0) {
+    wrap.hidden = true;
+    return;
+  }
+  listEl.replaceChildren();
+  for (const num of list) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "recent-tracking-chip";
+    btn.textContent = num;
+    btn.addEventListener("click", () => {
+      trackingInput.value = num;
+      trackShipment(num);
+    });
+    listEl.appendChild(btn);
+  }
+  wrap.hidden = false;
 }
 const deliveryStatuses = ["Order placed", "Picked up", "In transit", "Out for delivery", "Delivered"];
 const mapTileSources = [
@@ -192,16 +246,16 @@ function renderStaticFallback(shipment) {
   try {
     const container = document.querySelector('#live-map');
     if (!container) return;
-    const route = Array.isArray(shipment?.route) ? shipment.route.filter((p)=>Number.isFinite(p.lat)&&Number.isFinite(p.lng)) : [];
+    const route = Array.isArray(shipment?.route) ? shipment.route.filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng)) : [];
     const gps = shipment?.currentLocation && Number.isFinite(shipment.currentLocation.latitude) && Number.isFinite(shipment.currentLocation.longitude)
       ? { lat: shipment.currentLocation.latitude, lng: shipment.currentLocation.longitude }
       : null;
     const points = route.length ? route.map(p => ({ lat: p.lat, lng: p.lng })) : (gps ? [gps] : []);
     if (points.length === 0) return;
-    let minLat = Math.min(...points.map(p=>p.lat));
-    let maxLat = Math.max(...points.map(p=>p.lat));
-    let minLng = Math.min(...points.map(p=>p.lng));
-    let maxLng = Math.max(...points.map(p=>p.lng));
+    let minLat = Math.min(...points.map(p => p.lat));
+    let maxLat = Math.max(...points.map(p => p.lat));
+    let minLng = Math.min(...points.map(p => p.lng));
+    let maxLng = Math.max(...points.map(p => p.lng));
     // Add padding
     const latPad = (maxLat - minLat) * 0.1 || 0.01;
     const lngPad = (maxLng - minLng) * 0.1 || 0.01;
@@ -396,13 +450,20 @@ function renderShipment(shipment) {
   updateTimeline(events, shipment.status);
 }
 
+function setShareButtonsState(enabled) {
+  const isEnabled = Boolean(enabled && displayedTrackingNumber);
+  if (shareTrackingButton) shareTrackingButton.disabled = !isEnabled;
+  if (shareWhatsappButton) shareWhatsappButton.disabled = !isEnabled;
+  if (printReceiptButton) printReceiptButton.disabled = !isEnabled;
+}
+
 async function trackShipment(trackingNumber, { silent = false } = {}) {
   const requestId = ++trackingRequestId;
   const normalized = normalizeTrackingNumber(trackingNumber);
   if (!isValidTrackingNumber(normalized)) {
     errorMessage.textContent = "Enter a valid delivery number using letters, numbers, spaces, or hyphens.";
     errorMessage.hidden = false;
-    shareTrackingButton.disabled = !displayedTrackingNumber || normalized !== displayedTrackingNumber;
+    setShareButtonsState(normalized === displayedTrackingNumber);
     if (!silent) {
       trackButton.disabled = false;
       trackButton.innerHTML = 'Track package <span aria-hidden="true">→</span>';
@@ -411,7 +472,7 @@ async function trackShipment(trackingNumber, { silent = false } = {}) {
   }
   if (!silent) {
     errorMessage.hidden = true;
-    shareTrackingButton.disabled = true;
+    setShareButtonsState(false);
     shareLinkMessage.textContent = "";
     trackButton.disabled = true;
     trackButton.innerHTML = "Finding your package…";
@@ -421,19 +482,23 @@ async function trackShipment(trackingNumber, { silent = false } = {}) {
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error || "Tracking information could not be loaded.");
     if (requestId !== trackingRequestId) return;
+    if (lastRenderedShipment && lastRenderedShipment.trackingNumber === payload.trackingNumber && lastRenderedShipment.status !== payload.status) {
+      showToast(`Status update: Shipment ${payload.trackingNumber} is now "${payload.status}"!`, "success");
+    }
     renderShipment(payload);
     trackingInput.value = normalized;
+    addRecentShipment(normalized);
     const shareUrl = new URL(window.location.href);
     shareUrl.searchParams.set("tracking", normalized);
     window.history.replaceState(window.history.state, "", shareUrl);
-    shareTrackingButton.disabled = false;
+    setShareButtonsState(true);
     shareLinkMessage.textContent = "";
     errorMessage.hidden = true;
   } catch (error) {
     if (!silent && requestId === trackingRequestId) {
       errorMessage.textContent = error.message;
       errorMessage.hidden = false;
-      shareTrackingButton.disabled = !displayedTrackingNumber || normalized !== displayedTrackingNumber;
+      setShareButtonsState(normalized === displayedTrackingNumber);
     }
   } finally {
     if (!silent && requestId === trackingRequestId) {
@@ -459,20 +524,45 @@ shareTrackingButton.addEventListener("click", async () => {
   try {
     await navigator.clipboard.writeText(shareUrl.toString());
     shareLinkMessage.textContent = "Tracking link copied.";
+    showToast("Tracking link copied to clipboard!", "success");
   } catch (error) {
     shareLinkMessage.textContent = "Could not copy the link. Check your browser permissions.";
     console.error("Could not copy tracking link:", error);
   }
 });
 
+if (shareWhatsappButton) {
+  shareWhatsappButton.addEventListener("click", () => {
+    const trackingNumber = normalizeTrackingNumber(trackingInput.value);
+    if (!isValidTrackingNumber(trackingNumber) || trackingNumber !== displayedTrackingNumber) return;
+    const shareUrl = new URL(window.location.href);
+    shareUrl.searchParams.set("tracking", trackingNumber);
+    const message = `Hello! You can track your Northstar Courier shipment (${trackingNumber}) here: ${shareUrl.toString()}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
+  });
+}
+
+if (printReceiptButton) {
+  printReceiptButton.addEventListener("click", () => {
+    window.print();
+  });
+}
+
 const bookingForm = document.querySelector("#booking-form");
 const bookingMessage = document.querySelector("#booking-message");
 const createShipmentButton = document.querySelector("#create-shipment-button");
+const bookingSuccessCard = document.querySelector("#booking-success-card");
+const createdTrackingEl = document.querySelector("#created-tracking-number");
+const createdSummaryEl = document.querySelector("#created-shipment-summary");
+const createdTrackBtn = document.querySelector("#created-track-btn");
+const createdWhatsappBtn = document.querySelector("#created-whatsapp-btn");
+const createdCopyBtn = document.querySelector("#created-copy-btn");
 
 bookingForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   bookingMessage.textContent = "";
   bookingMessage.classList.remove("booking-message-error");
+  if (bookingSuccessCard) bookingSuccessCard.hidden = true;
   createShipmentButton.disabled = true;
   createShipmentButton.textContent = "Creating your shipment…";
   const formData = new FormData(bookingForm);
@@ -487,9 +577,48 @@ bookingForm.addEventListener("submit", async (event) => {
     bookingMessage.textContent = `Shipment created. Your tracking number is ${payload.trackingNumber}.`;
     bookingForm.reset();
     writeSavedShipment(payload.trackingNumber);
+    addRecentShipment(payload.trackingNumber);
     trackingInput.value = payload.trackingNumber;
+
+    if (bookingSuccessCard && createdTrackingEl) {
+      createdTrackingEl.textContent = payload.trackingNumber;
+      if (createdSummaryEl) {
+        const costStr = payload.price ? ` · ${new Intl.NumberFormat("en-NG", { style: "currency", currency: payload.price.currency, maximumFractionDigits: 0 }).format(payload.price.amount)}` : "";
+        createdSummaryEl.textContent = `To ${payload.recipient} (${payload.destination}) · ${payload.service}${costStr}`;
+      }
+      bookingSuccessCard.hidden = false;
+
+      if (createdTrackBtn) {
+        createdTrackBtn.onclick = () => {
+          trackingInput.value = payload.trackingNumber;
+          trackShipment(payload.trackingNumber);
+          document.querySelector("#tracking").scrollIntoView({ behavior: "smooth" });
+        };
+      }
+      if (createdWhatsappBtn) {
+        createdWhatsappBtn.onclick = () => {
+          const shareUrl = new URL(window.location.href);
+          shareUrl.searchParams.set("tracking", payload.trackingNumber);
+          const text = `Hello ${payload.recipient}, your delivery has been booked with Northstar Courier! Tracking number: ${payload.trackingNumber}. Follow it live here: ${shareUrl.toString()}`;
+          window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+        };
+      }
+      if (createdCopyBtn) {
+        createdCopyBtn.onclick = async () => {
+          try {
+            await navigator.clipboard.writeText(payload.trackingNumber);
+            createdCopyBtn.textContent = "Copied!";
+            showToast("Tracking code copied to clipboard!", "success");
+            setTimeout(() => { createdCopyBtn.textContent = "Copy tracking number"; }, 2000);
+          } catch {
+            createdCopyBtn.textContent = "Could not copy";
+          }
+        };
+      }
+    }
+
+    showToast(`Shipment ${payload.trackingNumber} successfully created!`, "success");
     await trackShipment(payload.trackingNumber);
-    document.querySelector("#tracking").scrollIntoView({ behavior: "smooth" });
   } catch (error) {
     bookingMessage.textContent = error.message || "We couldn’t connect. Please try again.";
     bookingMessage.classList.add("booking-message-error");
@@ -581,6 +710,7 @@ const requestedTrackingNumber = new URLSearchParams(window.location.search).get(
 // Which shipment to show on load: a shared ?tracking= link first, then the shipment this
 // visitor created in this browser, then the sample shipment for everyone else.
 async function showInitialShipment() {
+  renderRecentShipments();
   if (requestedTrackingNumber) {
     trackingInput.value = requestedTrackingNumber;
     return trackShipment(requestedTrackingNumber);
@@ -610,7 +740,7 @@ if (new URLSearchParams(window.location.search).get("debug") === "true") {
       tileSource: tileLayer && tileLayer.options ? tileLayer.options.url : null,
       tileCount: document.querySelectorAll('.leaflet-tile').length,
       mapEmptyHidden: !!(mapEmptyState && mapEmptyState.hidden),
-      mapRect: (() => { try { const r = document.querySelector('#live-map')?.getBoundingClientRect(); return r ? { x: r.x, y: r.y, width: r.width, height: r.height } : null; } catch(e){ return null; } })(),
+      mapRect: (() => { try { const r = document.querySelector('#live-map')?.getBoundingClientRect(); return r ? { x: r.x, y: r.y, width: r.width, height: r.height } : null; } catch (e) { return null; } })(),
       location: location.href,
       online: navigator.onLine
     });
