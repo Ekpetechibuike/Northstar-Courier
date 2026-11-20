@@ -1,18 +1,24 @@
 // ====== EDIT YOUR BUSINESS DETAILS HERE ======
 // Leave a value empty ("") to hide it. The WhatsApp and Call buttons only appear once these are filled in.
 const NORTHSTAR_SITE = {
-  phone: "",          // e.g. "+234 801 234 5678"
-  whatsapp: "",       // digits only, with country code, e.g. "2348012345678"
-  email: "",          // e.g. "hello@yourdomain.com"
-  address: "",        // e.g. "12 Allen Avenue, Ikeja, Lagos"
-  hours: "",          // e.g. "Mon to Sat, 8am to 6pm"
-  whatsappMessage: "Hello Northstar, I need help with a delivery."
+  phone: "+234 801 234 5678",          // e.g. "+234 801 234 5678"
+  whatsapp: "2348012345678",       // digits only, with country code, e.g. "2348012345678"
+  email: "support@northstarcourier.com",          // e.g. "hello@yourdomain.com"
+  address: "12 Allen Avenue, Ikeja, Lagos",        // e.g. "12 Allen Avenue, Ikeja, Lagos"
+  hours: "Mon to Sat, 8:00 AM – 6:00 PM",          // e.g. "Mon to Sat, 8am to 6pm"
+  whatsappMessage: "Hello Northstar Courier, I need help with a delivery."
 };
 // ===============================================
 
 (function () {
   const site = NORTHSTAR_SITE;
   const digits = (value) => String(value || "").replace(/[^\d+]/g, "");
+
+  // Theme setup: restore saved theme or follow system
+  const savedTheme = localStorage.getItem("northstar:theme") || "auto";
+  if (savedTheme === "dark" || savedTheme === "light") {
+    document.documentElement.dataset.theme = savedTheme;
+  }
 
   function fill(name, text, href) {
     document.querySelectorAll(`[data-site="${name}"]`).forEach((element) => {
@@ -54,10 +60,40 @@ const NORTHSTAR_SITE = {
     document.body.appendChild(wrap);
   }
 
+  // Theme switcher button
+  const topbar = document.querySelector(".topbar");
+  const navLinks = document.querySelector(".nav-links");
+  if (topbar && navLinks) {
+    const themeBtn = document.createElement("button");
+    themeBtn.type = "button";
+    themeBtn.className = "theme-toggle-button";
+    themeBtn.setAttribute("aria-label", "Toggle color theme");
+    const updateThemeIcon = () => {
+      const current = document.documentElement.dataset.theme;
+      const isDark = current === "dark" || (!current && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      themeBtn.innerHTML = isDark
+        ? '<svg viewBox="0 0 24 24" aria-hidden="true" width="18" height="18"><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 1v3m0 16v3M4.22 4.22l2.12 2.12m11.32 11.32l2.12 2.12M1 12h3m16 0h3M4.22 19.78l2.12-2.12m11.32-11.32l2.12-2.12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'
+        : '<svg viewBox="0 0 24 24" aria-hidden="true" width="18" height="18"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      themeBtn.title = isDark ? "Switch to light mode" : "Switch to dark mode";
+    };
+    themeBtn.addEventListener("click", () => {
+      const current = document.documentElement.dataset.theme;
+      const isDark = current === "dark" || (!current && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      const next = isDark ? "light" : "dark";
+      document.documentElement.dataset.theme = next;
+      localStorage.setItem("northstar:theme", next);
+      updateThemeIcon();
+    });
+    updateThemeIcon();
+    navLinks.prepend(themeBtn);
+  }
+
   // Live price estimate on the booking form
   const size = document.getElementById("booking-size");
   const weight = document.getElementById("booking-weight");
   const service = document.getElementById("booking-service");
+  const fragile = document.getElementById("booking-fragile");
+  const insurance = document.getElementById("booking-insurance");
   const estimate = document.getElementById("booking-estimate");
   const date = document.getElementById("booking-date");
   if (date) {
@@ -70,7 +106,13 @@ const NORTHSTAR_SITE = {
     const update = () => {
       clearTimeout(timer);
       timer = setTimeout(async () => {
-        const params = new URLSearchParams({ size: size.value, weight: weight.value, service: service.value });
+        const params = new URLSearchParams({
+          size: size.value,
+          weight: weight.value,
+          service: service.value,
+          fragile: fragile?.checked ? "true" : "false",
+          insurance: insurance?.checked ? "true" : "false"
+        });
         try {
           const response = await fetch(`/api/quote?${params}`);
           const quote = await response.json();
@@ -82,7 +124,7 @@ const NORTHSTAR_SITE = {
         }
       }, 250);
     };
-    [size, weight, service].forEach((control) => control.addEventListener("input", update));
+    [size, weight, service, fragile, insurance].filter(Boolean).forEach((control) => control.addEventListener("input", update));
     update();
   }
 })();
