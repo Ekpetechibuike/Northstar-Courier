@@ -336,6 +336,7 @@ function renderStaticFallback(shipment) {
 }
 
 function renderMap(shipment, fitRoute) {
+  initMapIfNeeded(); // map is lazy-created, so make sure it exists before we check it
   const route = Array.isArray(shipment.route)
     ? shipment.route.filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng))
     : [];
