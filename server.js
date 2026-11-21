@@ -567,7 +567,7 @@ async function handleRequest(request, response) {
   response.setHeader("X-Frame-Options", "DENY");
   response.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   response.setHeader("Permissions-Policy", "geolocation=(self), camera=(), microphone=()");
-  response.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://*.tile.openstreetmap.org; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
+  response.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
   if (process.env.NODE_ENV === "production") {
     response.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
   }
