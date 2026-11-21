@@ -562,6 +562,37 @@ function enforceRateLimit(request, response, bucket, limit) {
   return true;
 }
 
+// Map tiles are fetched by this server and passed on to the browser, so the map still works
+// when a visitor's network or browser blocks the public tile servers directly.
+const tileCache = new Map();
+const tileCacheMaxEntries = 600;
+async function serveMapTile(request, response, z, x, y) {
+  const limit = 2 ** z;
+  if (z < 0 || z > 19 || x < 0 || y < 0 || x >= limit || y >= limit) {
+    return json(response, 400, { error: "Invalid tile." });
+  }
+  const key = `${z}/${x}/${y}`;
+  let tile = tileCache.get(key);
+  if (!tile) {
+    try {
+      const upstream = await fetch(`https://tile.openstreetmap.org/${key}.png`, {
+        headers: { "User-Agent": geocodingUserAgent, "Referer": "https://northstar-courier.onrender.com/", "Accept": "image/png" },
+        signal: AbortSignal.timeout(8_000)
+      });
+      if (!upstream.ok) throw new Error(`HTTP ${upstream.status}`);
+      tile = Buffer.from(await upstream.arrayBuffer());
+      if (tileCache.size >= tileCacheMaxEntries) tileCache.delete(tileCache.keys().next().value);
+      tileCache.set(key, tile);
+    } catch (error) {
+      console.error(`Map tile ${key} failed:`, error.message);
+      response.setHeader("Cache-Control", "no-store");
+      return json(response, 502, { error: "Map tile unavailable." });
+    }
+  }
+  response.writeHead(200, { "Content-Type": "image/png", "Content-Length": tile.length, "Cache-Control": "public, max-age=86400" });
+  response.end(request.method === "HEAD" ? undefined : tile);
+}
+
 async function handleRequest(request, response) {
   response.setHeader("X-Content-Type-Options", "nosniff");
   response.setHeader("X-Frame-Options", "DENY");
@@ -869,6 +900,12 @@ async function handleRequest(request, response) {
       return { result: { statusCode: 200, payload: shipment } };
     });
     return json(response, result.statusCode, result.payload);
+  }
+
+  const tileMatch = /^\/tiles\/(\d{1,2})\/(\d{1,7})\/(\d{1,7})\.png$/.exec(path);
+  if (tileMatch && (request.method === "GET" || request.method === "HEAD")) {
+    if (!enforceRateLimit(request, response, "tiles", 1200)) return;
+    return serveMapTile(request, response, Number(tileMatch[1]), Number(tileMatch[2]), Number(tileMatch[3]));
   }
 
   if (request.method !== "GET" && request.method !== "HEAD") {
