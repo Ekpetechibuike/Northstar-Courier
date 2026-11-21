@@ -1,9 +1,9 @@
 import { createServer } from "node:http";
-import { gzipSync } from "node:zlib";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { brotliCompressSync, constants as zlibConstants, gzipSync } from "node:zlib";
+import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { dirname, extname, join, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { randomBytes, randomInt, randomUUID, scrypt as scryptCallback, scryptSync, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, randomInt, randomUUID, scrypt as scryptCallback, scryptSync, timingSafeEqual } from "node:crypto";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const publicRoot = resolve(root, "public");
@@ -564,8 +564,10 @@ function enforceRateLimit(request, response, bucket, limit) {
 
 // Map tiles are fetched by this server and passed on to the browser, so the map still works
 // when a visitor's network or browser blocks the public tile servers directly.
+const staticCache = new Map();
 const tileCache = new Map();
-const tileCacheMaxEntries = 600;
+const tileCacheMaxEntries = 1500;
+const pendingTiles = new Map();
 async function serveMapTile(request, response, z, x, y) {
   const limit = 2 ** z;
   if (z < 0 || z > 19 || x < 0 || y < 0 || x >= limit || y >= limit) {
@@ -575,21 +577,30 @@ async function serveMapTile(request, response, z, x, y) {
   let tile = tileCache.get(key);
   if (!tile) {
     try {
-      const upstream = await fetch(`https://tile.openstreetmap.org/${key}.png`, {
-        headers: { "User-Agent": geocodingUserAgent, "Referer": "https://northstar-courier.onrender.com/", "Accept": "image/png" },
-        signal: AbortSignal.timeout(8_000)
-      });
-      if (!upstream.ok) throw new Error(`HTTP ${upstream.status}`);
-      tile = Buffer.from(await upstream.arrayBuffer());
-      if (tileCache.size >= tileCacheMaxEntries) tileCache.delete(tileCache.keys().next().value);
-      tileCache.set(key, tile);
+      // If several visitors (or several tiles of one view) ask for the same tile, fetch it only once.
+      let pending = pendingTiles.get(key);
+      if (!pending) {
+        pending = (async () => {
+          const upstream = await fetch(`https://tile.openstreetmap.org/${key}.png`, {
+            headers: { "User-Agent": geocodingUserAgent, "Referer": "https://northstar-courier.onrender.com/", "Accept": "image/png" },
+            signal: AbortSignal.timeout(8_000)
+          });
+          if (!upstream.ok) throw new Error(`HTTP ${upstream.status}`);
+          const data = Buffer.from(await upstream.arrayBuffer());
+          if (tileCache.size >= tileCacheMaxEntries) tileCache.delete(tileCache.keys().next().value);
+          tileCache.set(key, data);
+          return data;
+        })().finally(() => pendingTiles.delete(key));
+        pendingTiles.set(key, pending);
+      }
+      tile = await pending;
     } catch (error) {
       console.error(`Map tile ${key} failed:`, error.message);
       response.setHeader("Cache-Control", "no-store");
       return json(response, 502, { error: "Map tile unavailable." });
     }
   }
-  response.writeHead(200, { "Content-Type": "image/png", "Content-Length": tile.length, "Cache-Control": "public, max-age=86400" });
+  response.writeHead(200, { "Content-Type": "image/png", "Content-Length": tile.length, "Cache-Control": "public, max-age=604800" });
   response.end(request.method === "HEAD" ? undefined : tile);
 }
 
@@ -920,23 +931,53 @@ async function handleRequest(request, response) {
     return json(response, 403, { error: "Access denied." });
   }
   try {
-    let file = await readFile(filePath);
     const extension = extname(filePath);
-    if ([".html", ".js", ".css", ".webmanifest"].includes(extension)) {
-      response.setHeader("Cache-Control", "no-cache");
-    } else if ([".png", ".svg"].includes(extension)) {
-      response.setHeader("Cache-Control", "public, max-age=604800");
+    const info = await stat(filePath);
+    if (info.isDirectory()) return json(response, 404, { error: "Page not found." });
+    let entry = staticCache.get(filePath);
+    if (!entry || entry.mtimeMs !== info.mtimeMs || entry.size !== info.size) {
+      const raw = await readFile(filePath);
+      const compressible = [".html", ".js", ".css", ".svg", ".json", ".txt", ".xml", ".webmanifest"].includes(extension) && raw.length > 1024;
+      entry = {
+        mtimeMs: info.mtimeMs,
+        size: info.size,
+        raw,
+        etag: `"${createHash("sha1").update(raw).digest("base64url").slice(0, 22)}"`,
+        br: compressible ? brotliCompressSync(raw, { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 6 } }) : null,
+        gz: compressible ? gzipSync(raw) : null
+      };
+      if (staticCache.size > 300) staticCache.delete(staticCache.keys().next().value);
+      staticCache.set(filePath, entry);
     }
+    // Everything the page needs is cached in memory and compressed once, so repeat requests are cheap.
+    // Visitors' browsers keep their copies (images and the map library for a long time, the site's own
+    // files for a few minutes) and re-check with an ETag, so unchanged files come back as a tiny 304.
+    if ([".html", ".webmanifest"].includes(extension)) {
+      response.setHeader("Cache-Control", "no-cache");
+    } else if ([".js", ".css"].includes(extension) && !relativePath.startsWith("vendor")) {
+      response.setHeader("Cache-Control", "public, max-age=300, stale-while-revalidate=86400");
+    } else {
+      response.setHeader("Cache-Control", "public, max-age=2592000");
+    }
+    response.setHeader("ETag", entry.etag);
+    response.setHeader("Vary", "Accept-Encoding");
+    if (request.headers["if-none-match"] === entry.etag) {
+      response.writeHead(304);
+      return response.end();
+    }
+    const acceptEncoding = request.headers["accept-encoding"] || "";
+    let body = entry.raw;
     const headers = { "Content-Type": mimeTypes[extension] || "application/octet-stream" };
-    const compressible = [".html", ".js", ".css", ".svg", ".json", ".txt", ".xml", ".webmanifest"].includes(extension);
-    if (compressible && file.length > 1024 && /\bgzip\b/.test(request.headers["accept-encoding"] || "")) {
-      file = gzipSync(file);
+    if (entry.br && /\bbr\b/.test(acceptEncoding)) {
+      body = entry.br;
+      headers["Content-Encoding"] = "br";
+    } else if (entry.gz && /\bgzip\b/.test(acceptEncoding)) {
+      body = entry.gz;
       headers["Content-Encoding"] = "gzip";
     }
-    headers["Vary"] = "Accept-Encoding";
-    headers["Content-Length"] = file.length;
+    headers["Content-Length"] = body.length;
     response.writeHead(200, headers);
-    response.end(request.method === "HEAD" ? undefined : file);
+    response.end(request.method === "HEAD" ? undefined : body);
   } catch (error) {
     if (error.code === "ENOENT" || error.code === "EISDIR") return json(response, 404, { error: "Page not found." });
     throw error;
