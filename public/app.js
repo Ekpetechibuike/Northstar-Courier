@@ -8,8 +8,10 @@ const printReceiptButton = document.querySelector("#print-receipt");
 const shareLinkMessage = document.querySelector("#share-link-message");
 const timeline = document.querySelector("#timeline-list");
 const mapEmptyState = document.querySelector("#map-empty-state");
-const map = window.L ? L.map("live-map", { zoomControl: false, scrollWheelZoom: false }).setView([0, 0], 2) : null;
-const mapLayers = map ? L.layerGroup().addTo(map) : null;
+// Map is lazy-initialized the first time it's needed
+let map = null;
+let mapLayers = null;
+let mapInitialized = false;
 const mapViewport = document.querySelector("#map-viewport");
 let tileLayer;
 let tileSourceIndex = -1;
@@ -18,6 +20,24 @@ let displayedTrackingNumber;
 let trackingRequestId = 0;
 let mapResizeFrame = 0;
 let lastRenderedShipment = null;
+
+function initMapIfNeeded() {
+  if (mapInitialized || !window.L) return;
+  mapInitialized = true;
+  const isMobile = window.matchMedia("(pointer: coarse)").matches;
+  map = L.map("live-map", {
+    zoomControl: false,
+    scrollWheelZoom: false,
+    tap: false,         // prevents 300ms tap delay on mobile
+    fadeAnimation: true,
+    markerZoomAnimation: true,
+    preferCanvas: true  // faster rendering on mobile
+  }).setView([0, 0], 2);
+  mapLayers = L.layerGroup().addTo(map);
+  if (!isMobile) {
+    L.control.zoom({ position: "topright" }).addTo(map);
+  }
+}
 
 const demoTrackingNumber = "ST-8492-0317";
 const savedShipmentKey = "northstar:myShipment";
@@ -86,6 +106,12 @@ function renderRecentShipments() {
 const deliveryStatuses = ["Order placed", "Picked up", "In transit", "Out for delivery", "Delivered"];
 const mapTileSources = [
   {
+    url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+    attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    subdomains: "abcd",
+    maxZoom: 20
+  },
+  {
     url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
   }
@@ -93,6 +119,8 @@ const mapTileSources = [
 const mapTilesUnavailableMessage = "Map tiles could not be loaded. Check your internet connection and try again.";
 
 function addMapTileLayer() {
+  initMapIfNeeded();
+  if (!map) return;
   tileSourceIndex += 1;
   tileLoadErrors = 0;
   const source = mapTileSources[tileSourceIndex];
@@ -704,7 +732,14 @@ async function refreshShipment() {
   }
 }
 
-setInterval(refreshShipment, 15_000);
+// Pause polling when the tab is hidden to save bandwidth and battery
+function scheduleRefresh() {
+  setTimeout(async () => {
+    if (!document.hidden) await refreshShipment();
+    scheduleRefresh();
+  }, 15_000);
+}
+scheduleRefresh();
 
 const requestedTrackingNumber = new URLSearchParams(window.location.search).get("tracking");
 // Which shipment to show on load: a shared ?tracking= link first, then the shipment this
