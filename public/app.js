@@ -31,7 +31,7 @@ function initMapIfNeeded() {
     zoomControl: false,
     scrollWheelZoom: false,
     tap: false,         // prevents 300ms tap delay on mobile
-    fadeAnimation: true,
+    fadeAnimation: false, // show tiles instantly instead of fading them in
     markerZoomAnimation: true,
     preferCanvas: true  // faster rendering on mobile
   }).setView([0, 0], 2);
@@ -510,7 +510,7 @@ function setShareButtonsState(enabled) {
   if (printReceiptButton) printReceiptButton.disabled = !isEnabled;
 }
 
-async function trackShipment(trackingNumber, { silent = false } = {}) {
+async function trackShipment(trackingNumber, { silent = false, prefetched = null } = {}) {
   const requestId = ++trackingRequestId;
   const normalized = normalizeTrackingNumber(trackingNumber);
   if (!isValidTrackingNumber(normalized)) {
@@ -531,9 +531,12 @@ async function trackShipment(trackingNumber, { silent = false } = {}) {
     trackButton.innerHTML = "Finding your package…";
   }
   try {
-    const response = await fetch(`/api/shipments/${encodeURIComponent(normalized)}`);
-    const payload = await response.json();
-    if (!response.ok) throw new Error(payload.error || "Tracking information could not be loaded.");
+    let payload = prefetched;
+    if (!payload) {
+      const response = await fetch(`/api/shipments/${encodeURIComponent(normalized)}`);
+      payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Tracking information could not be loaded.");
+    }
     if (requestId !== trackingRequestId) return;
     if (lastRenderedShipment && lastRenderedShipment.trackingNumber === payload.trackingNumber && lastRenderedShipment.status !== payload.status) {
       showToast(`Status update: Shipment ${payload.trackingNumber} is now "${payload.status}"!`, "success");
@@ -781,7 +784,7 @@ async function showInitialShipment() {
       const check = await fetch(`/api/shipments/${encodeURIComponent(savedTrackingNumber)}`);
       if (check.ok) {
         trackingInput.value = savedTrackingNumber;
-        return trackShipment(savedTrackingNumber);
+        return trackShipment(savedTrackingNumber, { prefetched: await check.json() });
       }
       if (check.status === 404) clearSavedShipment();
     } catch { /* offline or server busy: fall back to the sample */ }
