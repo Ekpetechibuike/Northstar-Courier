@@ -15,6 +15,8 @@ let mapInitialized = false;
 const mapViewport = document.querySelector("#map-viewport");
 let tileLayer;
 let tileSourceIndex = -1;
+let tileWatchdog = 0;
+let tilesLoadedForSource = false;
 let tileLoadErrors = 0;
 let displayedTrackingNumber;
 let trackingRequestId = 0;
@@ -37,6 +39,17 @@ function initMapIfNeeded() {
   if (!isMobile) {
     L.control.zoom({ position: "topright" }).addTo(map);
   }
+  // Keep the map sized correctly when the layout changes (the map is created lazily,
+  // so this has to be set up here and not at page load).
+  const resizeMap = () => {
+    cancelAnimationFrame(mapResizeFrame);
+    mapResizeFrame = requestAnimationFrame(() => map && map.invalidateSize({ pan: false }));
+  };
+  if (mapViewport && "ResizeObserver" in window) new ResizeObserver(resizeMap).observe(mapViewport);
+  window.addEventListener("orientationchange", resizeMap);
+  window.addEventListener("load", resizeMap);
+  window.visualViewport?.addEventListener("resize", resizeMap);
+  setTimeout(resizeMap, 300);
 }
 
 const demoTrackingNumber = "ST-8492-0317";
@@ -130,6 +143,20 @@ function addMapTileLayer() {
     ...(source.subdomains ? { subdomains: source.subdomains } : {})
   }).addTo(map);
   tileLayer = sourceLayer;
+  clearTimeout(tileWatchdog);
+  tileWatchdog = setTimeout(() => {
+    // Tiles that neither load nor fail (slow or filtered network): move to the next source.
+    if (tileLayer !== sourceLayer || tilesLoadedForSource) return;
+    if (tileSourceIndex < mapTileSources.length - 1) {
+      map.removeLayer(sourceLayer);
+      addMapTileLayer();
+    } else {
+      mapEmptyState.textContent = mapTilesUnavailableMessage;
+      mapEmptyState.hidden = false;
+      try { renderStaticFallback(lastRenderedShipment); } catch (e) { /* ignore */ }
+    }
+  }, 7000);
+  tilesLoadedForSource = false;
   tileLayer.on("tileerror", () => {
     if (tileLayer !== sourceLayer) return;
     tileLoadErrors += 1;
@@ -146,6 +173,8 @@ function addMapTileLayer() {
   });
   tileLayer.on("tileload", () => {
     if (tileLayer !== sourceLayer) return;
+    tilesLoadedForSource = true;
+    clearTimeout(tileWatchdog);
     tileLoadErrors = 0;
     if (mapEmptyState.textContent === mapTilesUnavailableMessage) mapEmptyState.hidden = true;
     try {
@@ -427,15 +456,6 @@ function fitShipmentRoute(shipment, routePoints) {
   map.fitBounds(L.latLngBounds(visiblePoints), { padding: [42, 42], maxZoom: 14 });
 }
 
-if (map && mapViewport) {
-  const resizeMap = () => {
-    cancelAnimationFrame(mapResizeFrame);
-    mapResizeFrame = requestAnimationFrame(() => map.invalidateSize({ pan: false }));
-  };
-  if ("ResizeObserver" in window) new ResizeObserver(resizeMap).observe(mapViewport);
-  window.addEventListener("orientationchange", resizeMap);
-  window.visualViewport?.addEventListener("resize", resizeMap);
-}
 
 function renderShipment(shipment) {
   lastRenderedShipment = shipment;
