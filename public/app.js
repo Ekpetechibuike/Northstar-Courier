@@ -8,6 +8,8 @@ const printReceiptButton = document.querySelector("#print-receipt");
 const shareLinkMessage = document.querySelector("#share-link-message");
 const timeline = document.querySelector("#timeline-list");
 const mapEmptyState = document.querySelector("#map-empty-state");
+const map = window.L ? L.map("live-map", { zoomControl: false, scrollWheelZoom: false }).setView([0, 0], 2) : null;
+const mapLayers = map ? L.layerGroup().addTo(map) : null;
 // Map is lazy-initialized the first time it's needed
 let map = null;
 let mapLayers = null;
@@ -732,6 +734,7 @@ async function refreshShipment() {
   }
 }
 
+setInterval(refreshShipment, 15_000);
 // Pause polling when the tab is hidden to save bandwidth and battery
 function scheduleRefresh() {
   setTimeout(async () => {
