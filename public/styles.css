@@ -3933,8 +3933,7 @@ textarea:focus-visible {
 }
 
 /* ---------- Dark mode (follows the visitor's device setting) ---------- */
-@media (prefers-color-scheme: dark) {
-  :root {
+@media (prefers-color-scheme: dark) {:root:not([data-theme="light"]) {
     color-scheme: dark;
     --ink: #e6edf3;
     --muted: #9aa9b6;
@@ -3943,147 +3942,107 @@ textarea:focus-visible {
     --green: #6cc795;
     --green-dark: #55b07f;
     --green-soft: #17332a;
-  }
-
-  body {
+  }:root:not([data-theme="light"]) body {
     background: #0b141c;
     color: var(--ink);
-  }
-
-  .topbar,
-  .nav-links,
-  .menu-toggle,
-  .footer,
-  .promise-strip,
-  .info-card,
-  .faq-list details,
-  .tracking-form,
-  .booking-form,
-  .support-form,
-  .shipment-details,
-  .route-summary,
-  .share-link-button,
-  .map-legend>span,
-  .map-live,
-  .map-zoom,
-  .eta-icon,
-  .eta-today,
-  .package-icon,
-  .route-plane,
-  .timeline-node,
-  .tracking-card-icon,
-  .support-privacy-note {
+  }:root:not([data-theme="light"]) .topbar,
+  :root:not([data-theme="light"]) .nav-links,
+  :root:not([data-theme="light"]) .menu-toggle,
+  :root:not([data-theme="light"]) .footer,
+  :root:not([data-theme="light"]) .promise-strip,
+  :root:not([data-theme="light"]) .info-card,
+  :root:not([data-theme="light"]) .faq-list details,
+  :root:not([data-theme="light"]) .tracking-form,
+  :root:not([data-theme="light"]) .booking-form,
+  :root:not([data-theme="light"]) .support-form,
+  :root:not([data-theme="light"]) .shipment-details,
+  :root:not([data-theme="light"]) .route-summary,
+  :root:not([data-theme="light"]) .share-link-button,
+  :root:not([data-theme="light"]) .map-legend>span,
+  :root:not([data-theme="light"]) .map-live,
+  :root:not([data-theme="light"]) .map-zoom,
+  :root:not([data-theme="light"]) .eta-icon,
+  :root:not([data-theme="light"]) .eta-today,
+  :root:not([data-theme="light"]) .package-icon,
+  :root:not([data-theme="light"]) .route-plane,
+  :root:not([data-theme="light"]) .timeline-node,
+  :root:not([data-theme="light"]) .tracking-card-icon,
+  :root:not([data-theme="light"]) .support-privacy-note {
     background-color: #15212d;
     border-color: #263647;
     color: var(--ink);
-  }
-
-  .tracking-input-wrap {
+  }:root:not([data-theme="light"]) .tracking-input-wrap {
     background: #0f1923;
     border-color: #2b3d4f;
-  }
-
-  .booking-form input,
-  .booking-form select,
-  .booking-form textarea,
-  .support-form select,
-  .support-form textarea,
-  .support-form input,
-  .tracking-input-wrap input {
+  }:root:not([data-theme="light"]) .booking-form input,
+  :root:not([data-theme="light"]) .booking-form select,
+  :root:not([data-theme="light"]) .booking-form textarea,
+  :root:not([data-theme="light"]) .support-form select,
+  :root:not([data-theme="light"]) .support-form textarea,
+  :root:not([data-theme="light"]) .support-form input,
+  :root:not([data-theme="light"]) .tracking-input-wrap input {
     background: #0f1923;
     border-color: #2b3d4f;
     color: var(--ink);
-  }
-
-  .booking-form input::placeholder,
-  .booking-form textarea::placeholder,
-  .tracking-input-wrap input::placeholder {
+  }:root:not([data-theme="light"]) .booking-form input::placeholder,
+  :root:not([data-theme="light"]) .booking-form textarea::placeholder,
+  :root:not([data-theme="light"]) .tracking-input-wrap input::placeholder {
     color: #6f8294;
-  }
-
-  .booking-form label,
-  .support-form label,
-  .tracking-form label {
+  }:root:not([data-theme="light"]) .booking-form label,
+  :root:not([data-theme="light"]) .support-form label,
+  :root:not([data-theme="light"]) .tracking-form label {
     color: #a9b8c4;
-  }
-
-  .info-heading p,
-  .info-card p,
-  .faq-list details p,
-  .hero-description,
-  .booking-copy p,
-  .footer,
-  .footer-col,
-  .footer-col a {
+  }:root:not([data-theme="light"]) .info-heading p,
+  :root:not([data-theme="light"]) .info-card p,
+  :root:not([data-theme="light"]) .faq-list details p,
+  :root:not([data-theme="light"]) .hero-description,
+  :root:not([data-theme="light"]) .booking-copy p,
+  :root:not([data-theme="light"]) .footer,
+  :root:not([data-theme="light"]) .footer-col,
+  :root:not([data-theme="light"]) .footer-col a {
     color: #a9b8c4;
-  }
-
-  .footer-col strong,
-  .footer-brand,
-  .info-card h3,
-  .info-heading h2 {
+  }:root:not([data-theme="light"]) .footer-col strong,
+  :root:not([data-theme="light"]) .footer-brand,
+  :root:not([data-theme="light"]) .info-card h3,
+  :root:not([data-theme="light"]) .info-heading h2 {
     color: #e6edf3;
-  }
-
-  .footer-bottom,
-  .footer {
+  }:root:not([data-theme="light"]) .footer-bottom,
+  :root:not([data-theme="light"]) .footer {
     border-color: #263647;
-  }
-
-  .step-number {
+  }:root:not([data-theme="light"]) .step-number {
     background: #263647;
-  }
-
-  .info-icon {
+  }:root:not([data-theme="light"]) .info-icon {
     background: #17332a;
     color: #6cc795;
-  }
-
-  .status-pill {
+  }:root:not([data-theme="light"]) .status-pill {
     background: #1b2a38;
     color: #cfe0ec;
-  }
-
-  body :is(h2, h3, strong) {
+  }:root:not([data-theme="light"]) body :is(h2,
+  :root:not([data-theme="light"]) h3,
+  :root:not([data-theme="light"]) strong) {
     color: #e6edf3 !important;
-  }
-
-  body .hero h1 {
+  }:root:not([data-theme="light"]) body .hero h1 {
     color: #fff !important;
-  }
-
-  .booking-section {
+  }:root:not([data-theme="light"]) .booking-section {
     background: #101c27 !important;
     border-color: #263647 !important;
     box-shadow: none !important;
-  }
-
-  .booking-form select {
+  }:root:not([data-theme="light"]) .booking-form select {
     font-size: 14px !important;
-  }
-
-  .booking-copy h2 .heading-period {
+  }:root:not([data-theme="light"]) .booking-copy h2 .heading-period {
     color: #ee7847 !important;
-  }
-
-  .support-privacy-note,
-  .form-note,
-  .route-label,
-  .tracking-number-label,
-  .support-optional,
-  .booking-form label .support-optional {
+  }:root:not([data-theme="light"]) .support-privacy-note,
+  :root:not([data-theme="light"]) .form-note,
+  :root:not([data-theme="light"]) .route-label,
+  :root:not([data-theme="light"]) .tracking-number-label,
+  :root:not([data-theme="light"]) .support-optional,
+  :root:not([data-theme="light"]) .booking-form label .support-optional {
     color: #9aa9b6 !important;
-  }
-
-  .booking-form .booking-estimate {
+  }:root:not([data-theme="light"]) .booking-form .booking-estimate {
     color: #6cc795 !important;
-  }
-
-  .nav-links a {
+  }:root:not([data-theme="light"]) .nav-links a {
     color: #cfdae3;
-  }
-
-  .nav-links a.nav-cta {
+  }:root:not([data-theme="light"]) .nav-links a.nav-cta {
     color: #fff;
   }
 }
@@ -4775,6 +4734,15 @@ textarea:focus-visible {
 
 }
 
+/* Dark surfaces the device-setting mode was missing (the site toggle already had them) */
+@media screen and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) :is(.theme-toggle-button, .recent-tracking-chip, .courier-panel, .courier-shipment-card, .courier-meta-grid, .courier-select-shipment-btn) {
+    background-color: #15212d !important;
+    border-color: #263647 !important;
+    color: #fff !important;
+  }
+}
+
 @media screen {
   [data-theme="dark"] {
     --ink: #fff;
@@ -4882,6 +4850,272 @@ textarea:focus-visible {
   [data-theme="dark"] .leaflet-tooltip.courier-tooltip {
     background: #15212d !important;
     border-color: #263647 !important;
+  }
+
+}
+
+/* Courier dashboard: dark surfaces for panels, buttons and fields */
+@media screen and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) :is(.courier-logout-button, .courier-secondary-button, .courier-inbox-actions button, .courier-inbox-message) {
+    background-color: #15212d !important;
+    border-color: #263647 !important;
+    color: #fff !important;
+  }
+
+  :root:not([data-theme="light"]) .courier-inbox-actions .courier-inbox-delete {
+    color: #ffa89b !important;
+  }
+
+  :root:not([data-theme="light"]) :is(.courier-field input, .courier-field select, .courier-inbox-toolbar select, .courier-form input, .courier-form select) {
+    background-color: #0f1923 !important;
+    border-color: #2b3d4f !important;
+    color: #fff !important;
+  }
+
+}
+
+@media screen {
+  [data-theme="dark"] :is(.courier-logout-button, .courier-secondary-button, .courier-inbox-actions button, .courier-inbox-message) {
+    background-color: #15212d !important;
+    border-color: #263647 !important;
+    color: #fff !important;
+  }
+
+  [data-theme="dark"] .courier-inbox-actions .courier-inbox-delete {
+    color: #ffa89b !important;
+  }
+
+  [data-theme="dark"] :is(.courier-field input, .courier-field select, .courier-inbox-toolbar select, .courier-form input, .courier-form select) {
+    background-color: #0f1923 !important;
+    border-color: #2b3d4f !important;
+    color: #fff !important;
+  }
+
+}
+
+/* ---------- Light mode: dark text ---------- */
+@media screen and (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --ink: #111827;
+    --muted: #3f4b57;
+  }
+
+  :root:not([data-theme="dark"]) :is(
+      .nav-links,
+      .hero-description,
+      .promise strong,
+      .tracking-form label,
+      .tracking-card-heading strong,
+      .section-heading h2,
+      .booking-copy h2,
+      .booking-copy p,
+      .info-heading p,
+      .info-card p,
+      .faq-list details p,
+      .route-stop strong,
+      .eta-panel strong,
+      .timeline > h3,
+      .timeline-copy strong,
+      .map-header h3,
+      .map-footer strong,
+      .shipment-title h3,
+      .shipment-title p span,
+      .shipment-title .recipient-copy h3,
+      .shipment-title .recipient-copy p,
+      .shipment-details strong,
+      .delivery-progress-heading h3,
+      .delivery-progress-heading > span,
+      .booking-form label,
+      .booking-form label .support-optional,
+      .booking-checkbox-label,
+      .support-privacy-note,
+      .map-legend > span,
+      .recent-tracking-label,
+    .support-link > span,
+    .map-footer > div > span,
+      .form-note,
+      .section-eyebrow,
+      .tracking-number-label,
+      .route-label,
+      .shipment-details span,
+      .route-summary span,
+      .courier-intro p,
+      .courier-panel-heading h2,
+      .courier-action-form h3,
+      .courier-field label,
+      .courier-form label,
+      .courier-route-summary strong,
+      .courier-inbox-message-heading h3,
+      .courier-inbox-meta span,
+      .courier-inbox-details,
+      .courier-inbox-body,
+      .courier-meta-grid strong,
+      .courier-shipment-card-header h3,
+      .courier-shipment-card-header p,
+      .courier-shipment-card-body,
+      .tracking-input-wrap input,
+      .booking-form input,
+      .booking-form select,
+      .booking-form textarea,
+      .support-form select,
+      .support-form textarea,
+      .support-form input,
+      .courier-field input,
+      .courier-field select,
+      .courier-inbox-toolbar select
+    ) {
+    color: #111827 !important;
+  }
+
+  :root:not([data-theme="dark"]) :is(input, select, textarea)::placeholder {
+    color: #5b6773 !important;
+    opacity: 1;
+  }
+
+}
+
+@media screen {
+  [data-theme="light"] {
+    --ink: #111827;
+    --muted: #3f4b57;
+  }
+
+  [data-theme="light"] :is(
+      .nav-links,
+      .hero-description,
+      .promise strong,
+      .tracking-form label,
+      .tracking-card-heading strong,
+      .section-heading h2,
+      .booking-copy h2,
+      .booking-copy p,
+      .info-heading p,
+      .info-card p,
+      .faq-list details p,
+      .route-stop strong,
+      .eta-panel strong,
+      .timeline > h3,
+      .timeline-copy strong,
+      .map-header h3,
+      .map-footer strong,
+      .shipment-title h3,
+      .shipment-title p span,
+      .shipment-title .recipient-copy h3,
+      .shipment-title .recipient-copy p,
+      .shipment-details strong,
+      .delivery-progress-heading h3,
+      .delivery-progress-heading > span,
+      .booking-form label,
+      .booking-form label .support-optional,
+      .booking-checkbox-label,
+      .support-privacy-note,
+      .map-legend > span,
+      .recent-tracking-label,
+    .support-link > span,
+    .map-footer > div > span,
+      .form-note,
+      .section-eyebrow,
+      .tracking-number-label,
+      .route-label,
+      .shipment-details span,
+      .route-summary span,
+      .courier-intro p,
+      .courier-panel-heading h2,
+      .courier-action-form h3,
+      .courier-field label,
+      .courier-form label,
+      .courier-route-summary strong,
+      .courier-inbox-message-heading h3,
+      .courier-inbox-meta span,
+      .courier-inbox-details,
+      .courier-inbox-body,
+      .courier-meta-grid strong,
+      .courier-shipment-card-header h3,
+      .courier-shipment-card-header p,
+      .courier-shipment-card-body,
+      .tracking-input-wrap input,
+      .booking-form input,
+      .booking-form select,
+      .booking-form textarea,
+      .support-form select,
+      .support-form textarea,
+      .support-form input,
+      .courier-field input,
+      .courier-field select,
+      .courier-inbox-toolbar select
+    ) {
+    color: #111827 !important;
+  }
+
+  [data-theme="light"] :is(input, select, textarea)::placeholder {
+    color: #5b6773 !important;
+    opacity: 1;
+  }
+
+}
+
+/* Courier inbox shortcut in dark mode */
+@media screen and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .courier-page .courier-inbox-nav {
+    background-color: #2a1d17 !important;
+    border-color: #6b3a24 !important;
+    color: #ffb08f !important;
+  }
+
+}
+
+@media screen {
+  [data-theme="dark"] .courier-page .courier-inbox-nav {
+    background-color: #2a1d17 !important;
+    border-color: #6b3a24 !important;
+    color: #ffb08f !important;
+  }
+
+}
+
+/* "Your Northstar courier" strip under the map, in dark mode */
+@media screen and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .map-footer {
+    background: linear-gradient(180deg, #15212d, #111c27) !important;
+    border-color: #263647 !important;
+  }
+
+  :root:not([data-theme="light"]) .map-footer > div > span {
+    color: #c3d0db !important;
+  }
+
+  :root:not([data-theme="light"]) .courier-avatar {
+    background: #2a1d17 !important;
+    border-color: #6b3a24 !important;
+    color: #ffb08f !important;
+  }
+
+  :root:not([data-theme="light"]) .courier-distance {
+    background: #17332a !important;
+    color: #8be0b0 !important;
+  }
+
+}
+
+@media screen {
+  [data-theme="dark"] .map-footer {
+    background: linear-gradient(180deg, #15212d, #111c27) !important;
+    border-color: #263647 !important;
+  }
+
+  [data-theme="dark"] .map-footer > div > span {
+    color: #c3d0db !important;
+  }
+
+  [data-theme="dark"] .courier-avatar {
+    background: #2a1d17 !important;
+    border-color: #6b3a24 !important;
+    color: #ffb08f !important;
+  }
+
+  [data-theme="dark"] .courier-distance {
+    background: #17332a !important;
+    color: #8be0b0 !important;
   }
 
 }
