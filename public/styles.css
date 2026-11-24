@@ -4933,6 +4933,7 @@ textarea:focus-visible {
       .recent-tracking-label,
     .support-link > span,
     .map-footer > div > span,
+    .courier-meta-grid span,
       .form-note,
       .section-eyebrow,
       .tracking-number-label,
@@ -5013,6 +5014,7 @@ textarea:focus-visible {
       .recent-tracking-label,
     .support-link > span,
     .map-footer > div > span,
+    .courier-meta-grid span,
       .form-note,
       .section-eyebrow,
       .tracking-number-label,
@@ -5116,6 +5118,137 @@ textarea:focus-visible {
   [data-theme="dark"] .courier-distance {
     background: #17332a !important;
     color: #8be0b0 !important;
+  }
+
+}
+
+/* Dark map: the map tiles are darkened in dark mode and left alone in light mode */
+@media screen and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .leaflet-tile-pane {
+    filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.92) saturate(0.85);
+  }
+
+  :root:not([data-theme="light"]) :is(.leaflet-container, .map-viewport) {
+    background: #0f1923 !important;
+  }
+
+}
+
+@media screen {
+  [data-theme="dark"] .leaflet-tile-pane {
+    filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.92) saturate(0.85);
+  }
+
+  [data-theme="dark"] :is(.leaflet-container, .map-viewport) {
+    background: #0f1923 !important;
+  }
+
+}
+
+/* Courier portal: loaded shipment details and status badges in dark mode */
+@media screen and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) :is(.courier-route-summary, .courier-route-summary > div) {
+    background-color: #101c27 !important;
+    border-color: #263647 !important;
+  }
+
+  :root:not([data-theme="light"]) :is(.courier-route-summary span, .courier-meta-grid span) {
+    color: #c3d0db !important;
+  }
+
+  :root:not([data-theme="light"]) :is(.courier-status, .courier-inbox-count, .courier-inbox-status.is-resolved, .courier-status-pill.status-order-placed, .courier-status-pill.status-delivered) {
+    background-color: #17332a !important;
+    border-color: #2d6b4d !important;
+    color: #8be0b0 !important;
+  }
+
+  :root:not([data-theme="light"]) :is(.courier-inbox-status, .courier-inbox-status.is-new, .courier-status-pill.status-out-for-delivery) {
+    background-color: #2a1d17 !important;
+    border-color: #6b3a24 !important;
+    color: #ffb08f !important;
+  }
+
+  :root:not([data-theme="light"]) .courier-inbox-status.is-resolved {
+    background-color: #17332a !important;
+    border-color: #2d6b4d !important;
+    color: #8be0b0 !important;
+  }
+
+  :root:not([data-theme="light"]) .courier-status-pill.status-picked-up {
+    background-color: #2d2412 !important;
+    border-color: #6b5420 !important;
+    color: #f0c27a !important;
+  }
+
+  :root:not([data-theme="light"]) .courier-status-pill.status-in-transit {
+    background-color: #12283a !important;
+    border-color: #245073 !important;
+    color: #8cc8f5 !important;
+  }
+
+}
+
+@media screen {
+  [data-theme="dark"] :is(.courier-route-summary, .courier-route-summary > div) {
+    background-color: #101c27 !important;
+    border-color: #263647 !important;
+  }
+
+  [data-theme="dark"] :is(.courier-route-summary span, .courier-meta-grid span) {
+    color: #c3d0db !important;
+  }
+
+  [data-theme="dark"] :is(.courier-status, .courier-inbox-count, .courier-inbox-status.is-resolved, .courier-status-pill.status-order-placed, .courier-status-pill.status-delivered) {
+    background-color: #17332a !important;
+    border-color: #2d6b4d !important;
+    color: #8be0b0 !important;
+  }
+
+  [data-theme="dark"] :is(.courier-inbox-status, .courier-inbox-status.is-new, .courier-status-pill.status-out-for-delivery) {
+    background-color: #2a1d17 !important;
+    border-color: #6b3a24 !important;
+    color: #ffb08f !important;
+  }
+
+  [data-theme="dark"] .courier-inbox-status.is-resolved {
+    background-color: #17332a !important;
+    border-color: #2d6b4d !important;
+    color: #8be0b0 !important;
+  }
+
+  [data-theme="dark"] .courier-status-pill.status-picked-up {
+    background-color: #2d2412 !important;
+    border-color: #6b5420 !important;
+    color: #f0c27a !important;
+  }
+
+  [data-theme="dark"] .courier-status-pill.status-in-transit {
+    background-color: #12283a !important;
+    border-color: #245073 !important;
+    color: #8cc8f5 !important;
+  }
+
+}
+
+/* Courier portal messages in dark mode */
+@media screen and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .courier-message {
+    color: #8be0b0 !important;
+  }
+
+  :root:not([data-theme="light"]) .courier-message.courier-message-error {
+    color: #ffa89b !important;
+  }
+
+}
+
+@media screen {
+  [data-theme="dark"] .courier-message {
+    color: #8be0b0 !important;
+  }
+
+  [data-theme="dark"] .courier-message.courier-message-error {
+    color: #ffa89b !important;
   }
 
 }
