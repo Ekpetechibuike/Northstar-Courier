@@ -4666,7 +4666,16 @@ textarea:focus-visible {
 /* ---------- Dark mode: white text ---------- */
 @media screen and (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
+    --ink: #fff;
     --muted: #c3d0db;
+  }
+
+  :root:not([data-theme="light"]) :is(input:not([type="checkbox"], [type="radio"]), select, textarea) {
+    color: #fff;
+  }
+
+  :root:not([data-theme="light"]) :where(button) {
+    color: inherit;
   }
 
   :root:not([data-theme="light"]) :is(
@@ -4676,6 +4685,8 @@ textarea:focus-visible {
       .tracking-card-heading strong,
       .section-heading h2,
       .booking-copy h2,
+      .booking-copy p,
+      .hero-description,
       .info-heading p,
       .info-card p,
       .faq-list details p,
@@ -4691,12 +4702,15 @@ textarea:focus-visible {
       .shipment-title .recipient-copy p,
       .shipment-details strong,
       .delivery-progress-heading h3,
+      .delivery-progress-heading > span,
       .booking-form label,
       .booking-form label .support-optional,
       .booking-checkbox-label,
       .support-privacy-note,
       .map-legend > span,
       .map-zoom button,
+      .print-receipt-button,
+      .courier-intro p,
       .courier-panel-heading h2,
       .courier-action-form h3,
       .courier-field label,
@@ -4708,6 +4722,9 @@ textarea:focus-visible {
       .courier-meta-grid strong,
       .courier-shipment-card-header h3,
       .courier-shipment-card-header p,
+      .courier-shipment-card-body,
+      .courier-notes-box span,
+      .courier-step,
       .tracking-input-wrap input,
       .booking-form input,
       .booking-form select,
@@ -4721,6 +4738,20 @@ textarea:focus-visible {
       .leaflet-tooltip.courier-tooltip
     ) {
     color: #fff !important;
+  }
+
+  :root:not([data-theme="light"]) :is(
+      .eyebrow,
+      .live-indicator,
+      .map-live,
+      .eta-icon,
+      .eta-today,
+      .card-footer a,
+      .booking-form .booking-estimate,
+      .share-link-message,
+      .timeline-item.current .timeline-copy strong
+    ) {
+    color: #8be0b0 !important;
   }
 
   :root:not([data-theme="light"]) :is(input, select, textarea)::placeholder {
@@ -4746,7 +4777,16 @@ textarea:focus-visible {
 
 @media screen {
   [data-theme="dark"] {
+    --ink: #fff;
     --muted: #c3d0db;
+  }
+
+  [data-theme="dark"] :is(input:not([type="checkbox"], [type="radio"]), select, textarea) {
+    color: #fff;
+  }
+
+  [data-theme="dark"] :where(button) {
+    color: inherit;
   }
 
   [data-theme="dark"] :is(
@@ -4756,6 +4796,8 @@ textarea:focus-visible {
       .tracking-card-heading strong,
       .section-heading h2,
       .booking-copy h2,
+      .booking-copy p,
+      .hero-description,
       .info-heading p,
       .info-card p,
       .faq-list details p,
@@ -4771,12 +4813,15 @@ textarea:focus-visible {
       .shipment-title .recipient-copy p,
       .shipment-details strong,
       .delivery-progress-heading h3,
+      .delivery-progress-heading > span,
       .booking-form label,
       .booking-form label .support-optional,
       .booking-checkbox-label,
       .support-privacy-note,
       .map-legend > span,
       .map-zoom button,
+      .print-receipt-button,
+      .courier-intro p,
       .courier-panel-heading h2,
       .courier-action-form h3,
       .courier-field label,
@@ -4788,6 +4833,9 @@ textarea:focus-visible {
       .courier-meta-grid strong,
       .courier-shipment-card-header h3,
       .courier-shipment-card-header p,
+      .courier-shipment-card-body,
+      .courier-notes-box span,
+      .courier-step,
       .tracking-input-wrap input,
       .booking-form input,
       .booking-form select,
@@ -4801,6 +4849,20 @@ textarea:focus-visible {
       .leaflet-tooltip.courier-tooltip
     ) {
     color: #fff !important;
+  }
+
+  [data-theme="dark"] :is(
+      .eyebrow,
+      .live-indicator,
+      .map-live,
+      .eta-icon,
+      .eta-today,
+      .card-footer a,
+      .booking-form .booking-estimate,
+      .share-link-message,
+      .timeline-item.current .timeline-copy strong
+    ) {
+    color: #8be0b0 !important;
   }
 
   [data-theme="dark"] :is(input, select, textarea)::placeholder {
