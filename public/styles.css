@@ -4663,6 +4663,167 @@ textarea:focus-visible {
   color: #cfdae3;
 }
 
+/* ---------- Dark mode: white text ---------- */
+@media screen and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --muted: #c3d0db;
+  }
+
+  :root:not([data-theme="light"]) :is(
+      .nav-links,
+      .promise strong,
+      .tracking-form label,
+      .tracking-card-heading strong,
+      .section-heading h2,
+      .booking-copy h2,
+      .info-heading p,
+      .info-card p,
+      .faq-list details p,
+      .route-stop strong,
+      .eta-panel strong,
+      .timeline > h3,
+      .timeline-copy strong,
+      .map-header h3,
+      .map-footer strong,
+      .shipment-title h3,
+      .shipment-title p span,
+      .shipment-title .recipient-copy h3,
+      .shipment-title .recipient-copy p,
+      .shipment-details strong,
+      .delivery-progress-heading h3,
+      .booking-form label,
+      .booking-form label .support-optional,
+      .booking-checkbox-label,
+      .support-privacy-note,
+      .map-legend > span,
+      .map-zoom button,
+      .courier-panel-heading h2,
+      .courier-action-form h3,
+      .courier-field label,
+      .courier-form label,
+      .courier-route-summary strong,
+      .courier-inbox-message-heading h3,
+      .courier-inbox-details,
+      .courier-inbox-body,
+      .courier-meta-grid strong,
+      .courier-shipment-card-header h3,
+      .courier-shipment-card-header p,
+      .tracking-input-wrap input,
+      .booking-form input,
+      .booking-form select,
+      .booking-form textarea,
+      .support-form select,
+      .support-form textarea,
+      .support-form input,
+      .courier-field input,
+      .courier-field select,
+      .courier-inbox-toolbar select,
+      .leaflet-tooltip.courier-tooltip
+    ) {
+    color: #fff !important;
+  }
+
+  :root:not([data-theme="light"]) :is(input, select, textarea)::placeholder {
+    color: #9fb2c2 !important;
+    opacity: 1;
+  }
+
+  :root:not([data-theme="light"]) .leaflet-control-attribution {
+    background: rgba(11, 20, 28, 0.8) !important;
+    color: #c3d0db !important;
+  }
+
+  :root:not([data-theme="light"]) .leaflet-control-attribution a {
+    color: #fff !important;
+  }
+
+  :root:not([data-theme="light"]) .leaflet-tooltip.courier-tooltip {
+    background: #15212d !important;
+    border-color: #263647 !important;
+  }
+
+}
+
+@media screen {
+  [data-theme="dark"] {
+    --muted: #c3d0db;
+  }
+
+  [data-theme="dark"] :is(
+      .nav-links,
+      .promise strong,
+      .tracking-form label,
+      .tracking-card-heading strong,
+      .section-heading h2,
+      .booking-copy h2,
+      .info-heading p,
+      .info-card p,
+      .faq-list details p,
+      .route-stop strong,
+      .eta-panel strong,
+      .timeline > h3,
+      .timeline-copy strong,
+      .map-header h3,
+      .map-footer strong,
+      .shipment-title h3,
+      .shipment-title p span,
+      .shipment-title .recipient-copy h3,
+      .shipment-title .recipient-copy p,
+      .shipment-details strong,
+      .delivery-progress-heading h3,
+      .booking-form label,
+      .booking-form label .support-optional,
+      .booking-checkbox-label,
+      .support-privacy-note,
+      .map-legend > span,
+      .map-zoom button,
+      .courier-panel-heading h2,
+      .courier-action-form h3,
+      .courier-field label,
+      .courier-form label,
+      .courier-route-summary strong,
+      .courier-inbox-message-heading h3,
+      .courier-inbox-details,
+      .courier-inbox-body,
+      .courier-meta-grid strong,
+      .courier-shipment-card-header h3,
+      .courier-shipment-card-header p,
+      .tracking-input-wrap input,
+      .booking-form input,
+      .booking-form select,
+      .booking-form textarea,
+      .support-form select,
+      .support-form textarea,
+      .support-form input,
+      .courier-field input,
+      .courier-field select,
+      .courier-inbox-toolbar select,
+      .leaflet-tooltip.courier-tooltip
+    ) {
+    color: #fff !important;
+  }
+
+  [data-theme="dark"] :is(input, select, textarea)::placeholder {
+    color: #9fb2c2 !important;
+    opacity: 1;
+  }
+
+  [data-theme="dark"] .leaflet-control-attribution {
+    background: rgba(11, 20, 28, 0.8) !important;
+    color: #c3d0db !important;
+  }
+
+  [data-theme="dark"] .leaflet-control-attribution a {
+    color: #fff !important;
+  }
+
+  [data-theme="dark"] .leaflet-tooltip.courier-tooltip {
+    background: #15212d !important;
+    border-color: #263647 !important;
+  }
+
+}
+
 /* ---------- Print Stylesheet (Waybill / Receipt) ---------- */
 @media print {
   body {
